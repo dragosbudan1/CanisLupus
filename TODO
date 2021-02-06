@@ -1,0 +1,13 @@
+- add Db connection to record operations
+- add frontend
+- add configuration
+- add frontend settings
+- add numerics
+- logging
+- add strategies
+- clean up vps
+- some sort of pubsub (redis)
+- docker setup
+
+
+http://51.68.199.229:8075/ frontend

@@ -1,0 +1,32 @@
+version: "3.6"
+services:
+  rabbitmq:
+      image: 'rabbitmq:3.6-management-alpine'
+      ports:
+        # The standard AMQP protocol port
+        - '5672:5672'
+        # HTTP management UI
+        - '15672:15672'
+      expose:
+        - "5672"
+        - "15672"
+      networks:
+      - network
+  worker:
+    build: ./CanisLupus.Worker/
+    depends_on: 
+      - rabbitmq
+    networks:
+      - network
+  web:
+    build: ./CanisLupus.Web/
+    ports:
+      - 9200:9200
+    expose:
+      - "9200"
+    depends_on: 
+      - rabbitmq
+    networks:
+      - network
+networks:
+  network: {}
