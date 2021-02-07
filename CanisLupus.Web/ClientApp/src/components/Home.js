@@ -78,12 +78,10 @@ export class Home extends Component {
       lowClusterData: data02,
       minChart: 0,
       maxChart: 0.46,
-      chartViewSwitch: false,
-      sessionId: 'hello'
+      chartViewSwitch: false
     };
 
     this.getWorkerData = this.getWorkerData.bind(this)
-    this.setWorkerDataQueue = this.setWorkerDataQueue.bind(this)
     this.onChangeChartView = this.onChangeChartView.bind(this)
   }
   static displayName = Home.name;
@@ -93,20 +91,16 @@ export class Home extends Component {
   };
 
   async _loadAsyncData() {
-    //await this.getUserByToken()
-    await this.setWorkerDataQueue()
-
     await this.getWorkerData()
-
   }
 
-  setWorkerDataQueue() {
-    axios.post("/workerData", {
-      id: this.state.sessionId
-    }).then(result => {
-      console.log('set id' + this.state.sessionId)
-    }).catch(err => console.log(err))
-  }
+  // setWorkerDataQueue() {
+  //   axios.post("/workerData", {
+  //     id: this.state.sessionId
+  //   }).then(result => {
+  //     console.log('set id' + this.state.sessionId)
+  //   }).catch(err => console.log(err))
+  // }
 
   async getWorkerData() {
     axios.get(`/workerData`)
@@ -222,7 +216,6 @@ export class Home extends Component {
       </div>
     )
   }
-
 
   render() {
     return (

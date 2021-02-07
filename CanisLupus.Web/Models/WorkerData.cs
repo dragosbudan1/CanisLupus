@@ -1,6 +1,6 @@
 using System;
 
-namespace CanisLupus.Web.Controllers
+namespace CanisLupus.Web.Models
 {
     public class WorkerData
     {

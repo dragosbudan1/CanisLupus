@@ -1,3 +1,4 @@
+using CanisLupus.Web.Events;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -21,6 +22,7 @@ namespace CanisLupus.Web
         public void ConfigureServices(IServiceCollection services)
         {
 
+            services.AddTransient<IEventReceiver, EventReceiver>();
             services.AddControllersWithViews();
 
             // In production, the React files will be served from this directory
