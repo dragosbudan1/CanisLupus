@@ -13,11 +13,11 @@ namespace CanisLupus.Worker.Events
         Task<bool> PublishAsync(EventRequest req);
     }
 
-    public class CandleDataPublisher : IEventPublisher
+    public class EventPublisher : IEventPublisher
     {
-        private readonly ILogger<CandleDataPublisher> logger;
+        private readonly ILogger<EventPublisher> logger;
 
-        public CandleDataPublisher(ILogger<CandleDataPublisher> logger)
+        public EventPublisher(ILogger<EventPublisher> logger)
         {
             this.logger = logger;
         }

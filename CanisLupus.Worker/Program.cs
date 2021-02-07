@@ -25,10 +25,11 @@ namespace CanisLupus.Worker
 
                     services.AddTransient<IBinanceClient, BinanceClient>()
                             .AddTransient<IMarketMakerHandler, MarketMakerHandler>()
-                            .AddTransient<IEventPublisher, CandleDataPublisher>()
+                            .AddTransient<IEventPublisher, EventPublisher>()
                             .AddTransient<IClusterGenerator, ClusterGenerator>()
                             .AddTransient<ISwingPointsGenerator, SwingPointsGenerator>()
-                            .AddTransient<IWeightedMovingAverageCalculator, WeightedMovingAverageCalculator>();
+                            .AddTransient<IWeightedMovingAverageCalculator, WeightedMovingAverageCalculator>()
+                            .AddTransient<IIntersectionFinder, IntersectionFinder>();
                 });
     }
 }

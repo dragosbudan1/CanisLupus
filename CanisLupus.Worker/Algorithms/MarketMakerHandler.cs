@@ -27,13 +27,15 @@ namespace CanisLupus.Worker
         private readonly IClusterGenerator clusterGenerator;
         private readonly ISwingPointsGenerator swingPointsGenerator;
         private readonly IWeightedMovingAverageCalculator weightedMovingAverageCalculator;
+        private readonly IIntersectionFinder intersectionFinder;
 
         public MarketMakerHandler(ILogger<MarketMakerHandler> logger,
                                   IBinanceClient binanceClient,
                                   IEventPublisher candleDataPublisher,
                                   IClusterGenerator clusterGenerator,
                                   ISwingPointsGenerator swingPointsGenerator,
-                                  IWeightedMovingAverageCalculator weightedMovingAverageCalculator)
+                                  IWeightedMovingAverageCalculator weightedMovingAverageCalculator,
+                                  IIntersectionFinder intersectionFinder)
         {
             this.logger = logger;
             this.binanceClient = binanceClient;
@@ -41,6 +43,7 @@ namespace CanisLupus.Worker
             this.clusterGenerator = clusterGenerator;
             this.swingPointsGenerator = swingPointsGenerator;
             this.weightedMovingAverageCalculator = weightedMovingAverageCalculator;
+            this.intersectionFinder = intersectionFinder;
         }
 
         public async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -85,7 +88,7 @@ namespace CanisLupus.Worker
                 Value = JsonConvert.SerializeObject(smmaData)
             });
 
-            ProcessData(candleData, wmaData, smmaData);
+            var intersections = intersectionFinder.Find(candleData, wmaData.ToArray(), smmaData.ToArray(), candleData.Count);
 
             // var swingPoints = await swingPointsGenerator.GeneratePoints(listSymbolCandle);
             // result = await candleDataPublisher.PublishAsync(new EventRequest()

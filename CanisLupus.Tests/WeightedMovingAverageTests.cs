@@ -33,7 +33,7 @@ namespace CanisLupus.Tests
         }
 
         [Test]
-        public void Test1()
+        public void TestWma()
         {
             var wmaResults = new List<double>();
             for(int i = 0; i < testData.Count - 5; i++)
@@ -48,6 +48,8 @@ namespace CanisLupus.Tests
                 var wma = top / bottom;
                 wmaResults.Add(wma);
             }
+
+            Assert.IsNotEmpty(wmaResults);
         }
     }
 
