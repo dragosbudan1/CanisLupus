@@ -8,6 +8,7 @@ using CanisLupus.Worker.Algorithms;
 using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Exchange;
 using CanisLupus.Worker.Extensions;
+using CanisLupus.Worker.Models;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -15,7 +16,7 @@ namespace CanisLupus.Worker
 {
     public interface IMarketMakerHandler
     {
-         Task ExecuteAsync(CancellationToken stoppingToken);
+        Task ExecuteAsync(CancellationToken stoppingToken);
     }
 
     public class MarketMakerHandler : IMarketMakerHandler
@@ -46,30 +47,30 @@ namespace CanisLupus.Worker
         {
             //var latestSymbolCandle = await binanceClient.GetLatestCandleAsync("DOGEUSDT");
             var allCandleData = await binanceClient.GetCandlesAsync("DOGEUSDT", 144 + 60, "1m");
-            var listSymbolCandle = allCandleData.TakeLast(60).ToList();
-            logger.LogInformation("Candle {candle}", listSymbolCandle.FirstOrDefault().ToLoggableMin());
+            var candleData = allCandleData.TakeLast(60).ToList();
+            logger.LogInformation("Candle {candle}", candleData.FirstOrDefault().ToLoggableMin());
 
             var result = await candleDataPublisher.PublishAsync(new EventRequest()
             {
                 QueueName = "candleData",
-                Value = JsonConvert.SerializeObject(listSymbolCandle)
+                Value = JsonConvert.SerializeObject(candleData)
             });
 
-            var highClusters = await clusterGenerator.GenerateClusters(listSymbolCandle, ClusterType.High);
+            var highClusters = await clusterGenerator.GenerateClusters(candleData, ClusterType.High);
             result = await candleDataPublisher.PublishAsync(new EventRequest()
             {
                 QueueName = "highClusterData",
                 Value = JsonConvert.SerializeObject(highClusters)
             });
 
-            var lowClusters = await clusterGenerator.GenerateClusters(listSymbolCandle, ClusterType.Low);
+            var lowClusters = await clusterGenerator.GenerateClusters(candleData, ClusterType.Low);
             result = await candleDataPublisher.PublishAsync(new EventRequest()
             {
                 QueueName = "lowClusterData",
                 Value = JsonConvert.SerializeObject(lowClusters)
             });
 
-            var wmaData = weightedMovingAverageCalculator.Calculate(allCandleData, listSymbolCandle.Count);
+            var wmaData = weightedMovingAverageCalculator.Calculate(allCandleData, candleData.Count);
             result = await candleDataPublisher.PublishAsync(new EventRequest
             {
                 QueueName = "wmaData",
@@ -77,12 +78,14 @@ namespace CanisLupus.Worker
             });
 
 
-            var smmaData = weightedMovingAverageCalculator.Calculate(allCandleData.Skip(139).ToList(), listSymbolCandle.Count);
+            var smmaData = weightedMovingAverageCalculator.Calculate(allCandleData.Skip(139).ToList(), candleData.Count);
             result = await candleDataPublisher.PublishAsync(new EventRequest
             {
                 QueueName = "smmaData",
                 Value = JsonConvert.SerializeObject(smmaData)
             });
+
+            ProcessData(candleData, wmaData, smmaData);
 
             // var swingPoints = await swingPointsGenerator.GeneratePoints(listSymbolCandle);
             // result = await candleDataPublisher.PublishAsync(new EventRequest()
@@ -103,6 +106,44 @@ namespace CanisLupus.Worker
             // sell order
 
             await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
+        }
+
+        private void ProcessData(List<CandleRawData> candleData, List<Vector2> allWmaData, List<Vector2> allSmmaData, int dataSetCount = 60)
+        {
+            // find intersection in current data sample
+            var wmaData = allWmaData.TakeLast(dataSetCount).ToArray();
+            var smmaData = allSmmaData.TakeLast(dataSetCount).ToArray();
+            var intersectionList = new List<Vector2>();
+            Console.WriteLine($"{wmaData.Length} {smmaData.Length}");
+            for (int i = 0; i < wmaData.Length - 1; i++)
+            {
+                var diff = Math.Abs((decimal)(wmaData[i].Y - smmaData[i].Y));
+                if (diff < 0.00005m)
+                {
+                    Console.WriteLine($"Diff {diff} Wma: {wmaData[i]} Smma: {smmaData[i]}");
+                    intersectionList.Add(wmaData[i]);
+                }
+            }
+
+            List<string> messages = new List<string>();
+            if (!intersectionList.Any())
+            {
+                // log no interesections found
+                var message = $"{DateTime.UtcNow} No intersections found between {candleData.FirstOrDefault().OpenTime} - {candleData.LastOrDefault().CloseTime}";
+                logger.LogInformation(message);
+                messages.Add(message);
+            }
+            else
+            {
+                foreach (var item in intersectionList)
+                {
+                    var message = $"{DateTime.UtcNow} Intersection found: {candleData[(int)item.X].ToLoggable()}, wma: {item.Y}";
+                    logger.LogInformation(message);
+                    messages.Add(message);
+                }
+            }
+
+            candleDataPublisher.PublishAsync(new EventRequest { QueueName = "tradingLogs", Value = JsonConvert.SerializeObject(messages) });
         }
     }
 }

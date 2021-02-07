@@ -5,6 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ScatterChart, ZAxis, Scatter, BarChart, Bar, Cell, ComposedChart
 } from 'recharts';
 import ViewControls from './ViewControls'
+import LogsDisplay from './LogsDisplay'
 
 const workerData = [
   {
@@ -71,14 +72,15 @@ export class Home extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      lastMessage: 'null',
       lineData: workerData,
       candleData: candleData,
       highClusterData: data01,
       lowClusterData: data02,
       minChart: 0,
       maxChart: 0.46,
-      chartViewSwitch: false
+      chartViewSwitch: false,
+      tradingLogs: ['Waiting for logs'],
+      lastUpdated: null
     };
 
     this.getWorkerData = this.getWorkerData.bind(this)
@@ -149,7 +151,9 @@ export class Home extends Component {
             minChart: minChart,
             maxChart: maxChart,
             highClusterData: highClusterData,
-            lowClusterData: lowClusterData
+            lowClusterData: lowClusterData,
+            lastUpdated: new Date().toUTCString(),
+            tradingLogs: result.data.tradingLogsData
           })
         }
 
@@ -174,6 +178,9 @@ export class Home extends Component {
   renderCandlesChart() {
     return (
       <div>
+        <div>
+          Last Updated: {this.state.lastUpdated}
+        </div>
         <ComposedChart width={780} height={300} data={this.state.candleData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="time" />
@@ -226,6 +233,7 @@ export class Home extends Component {
         <div>
           {this.state.chartViewSwitch && this.renderLineChart()}
           {!this.state.chartViewSwitch && this.renderCandlesChart()}
+          <LogsDisplay logs={this.state.tradingLogs} />
         </div>
         <div>
           <ScatterChart

@@ -1,17 +1,12 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using CanisLupus.Web.Events;
 using CanisLupus.Web.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
+
 
 namespace CanisLupus.Web.Controllers
 {
@@ -50,14 +45,16 @@ namespace CanisLupus.Web.Controllers
             var task3 = eventReceiver.ReceiveAsync<List<System.Numerics.Vector2>>("lowClusterData");
             var task4 = eventReceiver.ReceiveAsync<List<System.Numerics.Vector2>>("wmaData");
             var task5 = eventReceiver.ReceiveAsync<List<System.Numerics.Vector2>>("smmaData");
+            var task6 = eventReceiver.ReceiveAsync<List<string>>("tradingLogs");
 
-            Task.WaitAll(task1, task2, task3, task4, task5);
+            Task.WaitAll(task1, task2, task3, task4, task5, task6);
 
             var candleData = await Task.FromResult(task1.Result);
-            var highClusterData= await Task.FromResult(task2.Result);
-            var lowClusterData= await Task.FromResult(task3.Result);
+            var highClusterData = await Task.FromResult(task2.Result);
+            var lowClusterData = await Task.FromResult(task3.Result);
             var wmaData = await Task.FromResult(task4.Result);
             var smmaData = await Task.FromResult(task5.Result);
+            var tradingLogsData = await Task.FromResult(task6.Result);
 
             TryMergeMovingAverageData(candleData, wmaData, smmaData);
 
@@ -65,7 +62,8 @@ namespace CanisLupus.Web.Controllers
             {
                 candleData = candleData,
                 highClusterData = MapToVector2Class(highClusterData),
-                lowClusterData = MapToVector2Class(lowClusterData)
+                lowClusterData = MapToVector2Class(lowClusterData),
+                tradingLogsData = tradingLogsData
             };
         }
 
@@ -81,9 +79,10 @@ namespace CanisLupus.Web.Controllers
             }
         }
 
-        private List<Vector2> MapToVector2Class(List<System.Numerics.Vector2> vectors)
+        private List<Models.Vector2> MapToVector2Class(List<System.Numerics.Vector2> vectors)
         {
-            return vectors?.Select(x => new Vector2 { X = x.X, Y = x.Y }).ToList();
+            return vectors?.Select(x => new Models.Vector2 { X = x.X, Y = x.Y }).ToList();
         }
+
     }
 }
