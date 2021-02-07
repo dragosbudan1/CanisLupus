@@ -28,20 +28,16 @@ namespace CanisLupus.Worker.Events
             {
                 var factory = new ConnectionFactory();
 
-                using var connection = factory.CreateConnection(new List<string>(){"rabbitmq", "localhost"});
+                using var connection = factory.CreateConnection(new List<string>() { "rabbitmq", "localhost" });
                 using var channel = connection.CreateModel();
 
-                channel.QueueDeclare(queue: req.QueueName,
-                                     durable: false,
-                                     exclusive: false,
-                                     autoDelete: false,
-                                     arguments: null);
+                channel.ExchangeDeclare(exchange: req.QueueName, type: ExchangeType.Fanout);
 
                 string message = req.Value;
                 var body = Encoding.UTF8.GetBytes(message);
 
-                channel.BasicPublish(exchange: "",
-                                     routingKey: req.QueueName,
+                channel.BasicPublish(exchange: req.QueueName,
+                                     routingKey: "",
                                      basicProperties: null,
                                      body: body);
                 logger.LogInformation(" [{0}] Sent {1}", message.Length, req.QueueName);

@@ -6,8 +6,6 @@ import {
 } from 'recharts';
 import ViewControls from './ViewControls'
 
-
-
 const workerData = [
   {
     time: 1,
@@ -44,9 +42,9 @@ const workerData = [
 const data01 = [{ x: 1, y: 0.046 }, { x: 4, y: 0.046 }, { x: 6, y: 0.046 }];
 const data02 = [{ x: 1, y: 0.045 }, { x: 2, y: 0.045 }, { x: 5, y: 0.045 }];
 
-const candleData = [{time: 1, value: [0.045, 0.056], fill: 'red', wma: 0.47, smma: 0.44}, 
-{time: 2, value: [0.042, 0.074], fill: 'green', wma: 0.47, smma: 0.44}, 
-{time: 3, value: [0.045, 0.020], fill: 'red', wma: 0.47, smma: 0.44}]
+const candleData = [{ time: 1, value: [0.045, 0.056], fill: 'red', wma: 0.47, smma: 0.44 },
+{ time: 2, value: [0.042, 0.074], fill: 'green', wma: 0.47, smma: 0.44 },
+{ time: 3, value: [0.045, 0.020], fill: 'red', wma: 0.47, smma: 0.44 }]
 
 const CustomizedDot = (props) => {
   const {
@@ -80,10 +78,12 @@ export class Home extends Component {
       lowClusterData: data02,
       minChart: 0,
       maxChart: 0.46,
-      chartViewSwitch: false
+      chartViewSwitch: false,
+      sessionId: 'hello'
     };
 
     this.getWorkerData = this.getWorkerData.bind(this)
+    this.setWorkerDataQueue = this.setWorkerDataQueue.bind(this)
     this.onChangeChartView = this.onChangeChartView.bind(this)
   }
   static displayName = Home.name;
@@ -94,15 +94,21 @@ export class Home extends Component {
 
   async _loadAsyncData() {
     //await this.getUserByToken()
+    await this.setWorkerDataQueue()
 
-    setInterval(async () => {
-      // Your custom logic here
-      await this.getWorkerData()
-    }, 5000);
+    await this.getWorkerData()
 
   }
 
-  getWorkerData() {
+  setWorkerDataQueue() {
+    axios.post("/workerData", {
+      id: this.state.sessionId
+    }).then(result => {
+      console.log('set id' + this.state.sessionId)
+    }).catch(err => console.log(err))
+  }
+
+  async getWorkerData() {
     axios.get(`/workerData`)
       .then(result => {
         if (result.data !== null && result.data.candleData !== null && result.data.lowClusterData !== null && result.data.highClusterData !== null) {
@@ -152,6 +158,8 @@ export class Home extends Component {
             lowClusterData: lowClusterData
           })
         }
+
+        this.getWorkerData()
       }).catch(err => console.log(err))
   }
 
@@ -178,14 +186,14 @@ export class Home extends Component {
           <YAxis domain={[this.state.minChart, this.state.maxChart]} />
           <Tooltip />
           <Legend />
-          <Bar dataKey="value"/>
+          <Bar dataKey="value" />
           {
-            this.state.candleData.map((entry, index) =>(
-              <Cell key={`cell-${index}`} stroke={entry.fill}  strokeWidth={2}/>
+            this.state.candleData.map((entry, index) => (
+              <Cell key={`cell-${index}`} stroke={entry.fill} strokeWidth={2} />
             ))
           }
-          <Line type="monotone" dataKey="wma" stroke="#ff7300" dot={false}/>
-          <Line type="monotone" dataKey="smma" stroke="#00008b" dot={false}/>
+          <Line type="monotone" dataKey="wma" stroke="#ff7300" dot={false} />
+          <Line type="monotone" dataKey="smma" stroke="#00008b" dot={false} />
         </ComposedChart>
       </div>
     )

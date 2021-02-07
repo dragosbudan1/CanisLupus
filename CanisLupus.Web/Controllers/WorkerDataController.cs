@@ -13,6 +13,11 @@ using RabbitMQ.Client.Events;
 
 namespace CanisLupus.Web.Controllers
 {
+    public class SessionInitRequest
+    {
+        public string Id { get; set; }
+    }
+
     [ApiController]
     [Route("[controller]")]
     public class WorkerDataController : ControllerBase
@@ -25,6 +30,14 @@ namespace CanisLupus.Web.Controllers
             _logger = logger;
         }
 
+        [HttpPost]
+        public Task<bool> Post(SessionInitRequest req)
+        {
+            _logger.LogInformation("SessionId: {0}", req.Id);
+            //QueuePool.CreateQueue(req.Id)
+            return Task.FromResult(true);
+        }
+
         [HttpGet]
         public async Task<object> Get()
         {
@@ -32,11 +45,25 @@ namespace CanisLupus.Web.Controllers
             var factory = new ConnectionFactory();
             using var connection = factory.CreateConnection(new List<string>() { "rabbitmq", "localhost" });
 
-            var candleDataResponse = await GetQueueData("candleData", connection);
-            var highClusterDataResponse = await GetQueueData("highClusterData", connection);
-            var lowClusterDataResponse = await GetQueueData("lowClusterData", connection);
-            var wmaDataResponse = await GetQueueData("wmaData", connection);
-            var smmaDataResponse = await GetQueueData("smmaData", connection);
+            // var candleDataResponse = await GetQueueData("candleData", connection);
+            // var highClusterDataResponse = await GetQueueData("highClusterData", connection);
+            // var lowClusterDataResponse = await GetQueueData("lowClusterData", connection);
+            // var wmaDataResponse = await GetQueueData("wmaData", connection);
+            // var smmaDataResponse = await GetQueueData("smmaData", connection);
+
+            var task1 = GetQueueData("candleData", connection);
+            var task2 = GetQueueData("highClusterData", connection);
+            var task3 = GetQueueData("lowClusterData", connection);
+            var task4 = GetQueueData("wmaData", connection);
+            var task5 = GetQueueData("smmaData", connection);
+
+            Task.WaitAll(task1, task2, task3, task4, task5);
+
+            var candleDataResponse = await Task.FromResult(task1.Result);
+            var highClusterDataResponse = await Task.FromResult(task2.Result);
+            var lowClusterDataResponse = await Task.FromResult(task3.Result);
+            var wmaDataResponse = await Task.FromResult(task4.Result);
+            var smmaDataResponse = await Task.FromResult(task5.Result);
 
             var candleData = JsonConvert.DeserializeObject<List<WorkerData>>(candleDataResponse);
             var highClusterData = JsonConvert.DeserializeObject<List<System.Numerics.Vector2>>(highClusterDataResponse);
@@ -78,36 +105,38 @@ namespace CanisLupus.Web.Controllers
             public double Y { get; set; }
         }
 
-        private async Task<string> GetQueueData(string queueName, IConnection connection)
+        private async Task<string> GetQueueData(string exhName, IConnection connection)
         {
+
             using var channel = connection.CreateModel();
-            channel.QueueDeclare(queue: queueName,
-                                     durable: false,
-                                     exclusive: false,
-                                     autoDelete: false,
-                                     arguments: null);
+            channel.ExchangeDeclare(exchange: exhName, type: ExchangeType.Fanout, durable: false, autoDelete: false);
+            var queueName = channel.QueueDeclare().QueueName;
+            channel.QueueBind(queue: queueName,
+                              exchange: exhName,
+                              routingKey: "");
+
+            Console.WriteLine(" [*] Waiting for logs. {0} {1}", queueName, exhName);
 
             string message = string.Empty;
 
-            var msgCount = channel.MessageCount(queue: queueName);
-            if (msgCount > 0)
+            await Task.Run(async () =>
             {
-                await Task.Run(async () =>
+                var consumer = new EventingBasicConsumer(channel);
+                consumer.Received += (model, ea) =>
                 {
-                    var consumer = new EventingBasicConsumer(channel);
-                    consumer.Received += (model, ea) =>
-                    {
-                        var body = ea.Body.ToArray();
-                        message = Encoding.UTF8.GetString(body);
-                    };
-
-                    var result = channel.BasicConsume(queue: queueName,
-                                            autoAck: false,
-                                            consumer: consumer);
+                    var body = ea.Body.ToArray();
+                    message = Encoding.UTF8.GetString(body);
+                    Console.WriteLine(" [x] {0}", exhName);
+                };
+                channel.BasicConsume(queue: queueName,
+                                     autoAck: false,
+                                     consumer: consumer);
+                while (string.IsNullOrEmpty(message))
+                {
                     await Task.Delay(500);
-                });
-            }
-
+                }
+            });
+            
             return message;
         }
     }
