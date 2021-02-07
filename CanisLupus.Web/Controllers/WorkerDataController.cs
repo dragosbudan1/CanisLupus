@@ -30,16 +30,23 @@ namespace CanisLupus.Web.Controllers
         {
             _logger.LogInformation("Getting data");
             var factory = new ConnectionFactory();
-            using var connection = factory.CreateConnection(new List<string>(){"rabbitmq", "localhost"});
-            
+            using var connection = factory.CreateConnection(new List<string>() { "rabbitmq", "localhost" });
+
             var candleDataResponse = await GetQueueData("candleData", connection);
             var highClusterDataResponse = await GetQueueData("highClusterData", connection);
             var lowClusterDataResponse = await GetQueueData("lowClusterData", connection);
+            var wmaDataResponse = await GetQueueData("wmaData", connection);
+            var smmaDataResponse = await GetQueueData("smmaData", connection);
 
             var candleData = JsonConvert.DeserializeObject<List<WorkerData>>(candleDataResponse);
             var highClusterData = JsonConvert.DeserializeObject<List<System.Numerics.Vector2>>(highClusterDataResponse);
             var lowClusterData = JsonConvert.DeserializeObject<List<System.Numerics.Vector2>>(lowClusterDataResponse);
-            return new 
+            var wmaData = JsonConvert.DeserializeObject<List<System.Numerics.Vector2>>(wmaDataResponse);
+            var smmaData = JsonConvert.DeserializeObject<List<System.Numerics.Vector2>>(smmaDataResponse);
+
+            MergeMovingAverageData(candleData, wmaData, smmaData);
+
+            return new
             {
                 candleData = candleData,
                 highClusterData = MapToVector2Class(highClusterData),
@@ -47,9 +54,22 @@ namespace CanisLupus.Web.Controllers
             };
         }
 
+        private void MergeMovingAverageData(List<WorkerData> candleData, List<System.Numerics.Vector2> wmaData, List<System.Numerics.Vector2> smmaData)
+        {
+            if (candleData != null && wmaData != null && smmaData != null)
+            {
+                for (int i = 0; i < candleData.Count; i++)
+                {
+                    candleData[i].Wma = wmaData[i].Y;
+                    candleData[i].Smma = smmaData[i].Y;
+                }
+            }
+
+        }
+
         private List<Vector2> MapToVector2Class(List<System.Numerics.Vector2> vectors)
         {
-            return vectors?.Select(x => new Vector2 { X = x.X, Y = x.Y}).ToList();
+            return vectors?.Select(x => new Vector2 { X = x.X, Y = x.Y }).ToList();
         }
 
         public class Vector2
@@ -84,7 +104,7 @@ namespace CanisLupus.Web.Controllers
                     var result = channel.BasicConsume(queue: queueName,
                                             autoAck: false,
                                             consumer: consumer);
-                     await Task.Delay(500);
+                    await Task.Delay(500);
                 });
             }
 

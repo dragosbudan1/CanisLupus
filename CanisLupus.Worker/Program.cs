@@ -27,7 +27,8 @@ namespace CanisLupus.Worker
                             .AddTransient<IMarketMakerHandler, MarketMakerHandler>()
                             .AddTransient<IEventPublisher, CandleDataPublisher>()
                             .AddTransient<IClusterGenerator, ClusterGenerator>()
-                            .AddTransient<ISwingPointsGenerator, SwingPointsGenerator>();
+                            .AddTransient<ISwingPointsGenerator, SwingPointsGenerator>()
+                            .AddTransient<IWeightedMovingAverageCalculator, WeightedMovingAverageCalculator>();
                 });
     }
 }

@@ -25,25 +25,28 @@ namespace CanisLupus.Worker
         private readonly IEventPublisher candleDataPublisher;
         private readonly IClusterGenerator clusterGenerator;
         private readonly ISwingPointsGenerator swingPointsGenerator;
+        private readonly IWeightedMovingAverageCalculator weightedMovingAverageCalculator;
 
         public MarketMakerHandler(ILogger<MarketMakerHandler> logger,
                                   IBinanceClient binanceClient,
                                   IEventPublisher candleDataPublisher,
                                   IClusterGenerator clusterGenerator,
-                                  ISwingPointsGenerator swingPointsGenerator)
+                                  ISwingPointsGenerator swingPointsGenerator,
+                                  IWeightedMovingAverageCalculator weightedMovingAverageCalculator)
         {
             this.logger = logger;
             this.binanceClient = binanceClient;
             this.candleDataPublisher = candleDataPublisher;
             this.clusterGenerator = clusterGenerator;
             this.swingPointsGenerator = swingPointsGenerator;
+            this.weightedMovingAverageCalculator = weightedMovingAverageCalculator;
         }
 
         public async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             //var latestSymbolCandle = await binanceClient.GetLatestCandleAsync("DOGEUSDT");
-
-            var listSymbolCandle = await binanceClient.GetCandlesAsync("DOGEUSDT", 30, "1m");
+            var allCandleData = await binanceClient.GetCandlesAsync("DOGEUSDT", 144 + 60, "1m");
+            var listSymbolCandle = allCandleData.TakeLast(60).ToList();
             logger.LogInformation("Candle {candle}", listSymbolCandle.FirstOrDefault().ToLoggableMin());
 
             var result = await candleDataPublisher.PublishAsync(new EventRequest()
@@ -64,6 +67,21 @@ namespace CanisLupus.Worker
             {
                 QueueName = "lowClusterData",
                 Value = JsonConvert.SerializeObject(lowClusters)
+            });
+
+            var wmaData = weightedMovingAverageCalculator.Calculate(allCandleData, listSymbolCandle.Count);
+            result = await candleDataPublisher.PublishAsync(new EventRequest
+            {
+                QueueName = "wmaData",
+                Value = JsonConvert.SerializeObject(wmaData)
+            });
+
+
+            var smmaData = weightedMovingAverageCalculator.Calculate(allCandleData.Skip(139).ToList(), listSymbolCandle.Count);
+            result = await candleDataPublisher.PublishAsync(new EventRequest
+            {
+                QueueName = "smmaData",
+                Value = JsonConvert.SerializeObject(smmaData)
             });
 
             // var swingPoints = await swingPointsGenerator.GeneratePoints(listSymbolCandle);

@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import axios from 'axios';
 import { withRouter } from 'react-router-dom';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ScatterChart, ZAxis, Scatter, BarChart, Bar, Cell
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ScatterChart, ZAxis, Scatter, BarChart, Bar, Cell, ComposedChart
 } from 'recharts';
 import ViewControls from './ViewControls'
 
@@ -44,9 +44,9 @@ const workerData = [
 const data01 = [{ x: 1, y: 0.046 }, { x: 4, y: 0.046 }, { x: 6, y: 0.046 }];
 const data02 = [{ x: 1, y: 0.045 }, { x: 2, y: 0.045 }, { x: 5, y: 0.045 }];
 
-const candleData = [{time: 1, value: [0.045, 0.056], fill: 'red'}, 
-{time: 2, value: [0.042, 0.074], fill: 'green'}, 
-{time: 3, value: [0.045, 0.020], fill: 'red'}]
+const candleData = [{time: 1, value: [0.045, 0.056], fill: 'red', wma: 0.47, smma: 0.44}, 
+{time: 2, value: [0.042, 0.074], fill: 'green', wma: 0.47, smma: 0.44}, 
+{time: 3, value: [0.045, 0.020], fill: 'red', wma: 0.47, smma: 0.44}]
 
 const CustomizedDot = (props) => {
   const {
@@ -120,7 +120,9 @@ export class Home extends Component {
             return {
               time: i,
               value: [x.bottom.toFixed(5), x.top.toFixed(5)],
-              fill: x.orientation < 0 ? 'red' : 'green' 
+              fill: x.orientation < 0 ? 'red' : 'green',
+              wma: x.wma.toFixed(5),
+              smma: x.smma.toFixed(5)
             }
           })
 
@@ -170,7 +172,7 @@ export class Home extends Component {
   renderCandlesChart() {
     return (
       <div>
-        <BarChart width={780} height={300} data={this.state.candleData}>
+        <ComposedChart width={780} height={300} data={this.state.candleData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="time" />
           <YAxis domain={[this.state.minChart, this.state.maxChart]} />
@@ -179,10 +181,12 @@ export class Home extends Component {
           <Bar dataKey="value"/>
           {
             this.state.candleData.map((entry, index) =>(
-              <Cell key={`cell-${index}`} fill={entry.fill} />
+              <Cell key={`cell-${index}`} stroke={entry.fill}  strokeWidth={2}/>
             ))
           }
-        </BarChart>
+          <Line type="monotone" dataKey="wma" stroke="#ff7300" dot={false}/>
+          <Line type="monotone" dataKey="smma" stroke="#00008b" dot={false}/>
+        </ComposedChart>
       </div>
     )
   }

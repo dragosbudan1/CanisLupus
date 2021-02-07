@@ -8,5 +8,7 @@ namespace CanisLupus.Web.Controllers
         public double Bottom { get; set; }
         public DateTime OpenTime { get; set; }
         public int Orientation { get; set; }
+        public double Wma { get; set; }
+        public double Smma { get; internal set; }
     }
 }
