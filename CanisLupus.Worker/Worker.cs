@@ -19,12 +19,14 @@ namespace CanisLupus.Worker
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {            
+        {
             while (!stoppingToken.IsCancellationRequested)
             {
                 logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
 
                 await marketMakerHandler.ExecuteAsync(stoppingToken);
+
+                await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);            
             }
         }
     }

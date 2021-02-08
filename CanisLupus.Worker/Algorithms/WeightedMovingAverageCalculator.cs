@@ -6,12 +6,12 @@ namespace CanisLupus.Worker.Algorithms
 {
     public interface IWeightedMovingAverageCalculator
     {
-        List<Vector2> Calculate(List<CandleRawData> data, int dataSetCount);
+        List<Vector2> Calculate(List<CandleRawData> data, int? dataSetCount);
     }
 
     public class WeightedMovingAverageCalculator : IWeightedMovingAverageCalculator
     {
-        public List<Vector2> Calculate(List<CandleRawData> data, int dataSetCount)
+        public List<Vector2> Calculate(List<CandleRawData> data, int? dataSetCount = null)
         {
             var weightsCount = data.Count - dataSetCount;
             var weights = new List<double>();

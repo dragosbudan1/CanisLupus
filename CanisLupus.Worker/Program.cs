@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CanisLupus.Worker.Algorithms;
 using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Exchange;
+using CanisLupus.Worker.Trader;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -29,7 +30,8 @@ namespace CanisLupus.Worker
                             .AddTransient<IClusterGenerator, ClusterGenerator>()
                             .AddTransient<ISwingPointsGenerator, SwingPointsGenerator>()
                             .AddTransient<IWeightedMovingAverageCalculator, WeightedMovingAverageCalculator>()
-                            .AddTransient<IIntersectionFinder, IntersectionFinder>();
+                            .AddTransient<IIntersectionFinder, IntersectionFinder>()
+                            .AddTransient<ITradingClient, TradingClient>();
                 });
     }
 }

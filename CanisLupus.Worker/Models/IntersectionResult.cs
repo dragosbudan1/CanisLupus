@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 
 namespace CanisLupus.Worker.Models
@@ -8,9 +9,19 @@ namespace CanisLupus.Worker.Models
         Downward,
         Undefined
     }
+
+    public enum IntersectionStatus
+    {
+        Old = 0,
+        New,
+        Active,
+        Finished
+    }
     public class IntersectionResult
     {
-        public Vector2 Point { get; set; }  
+        public Vector2 Point { get; set; }
         public IntersectionType Type { get; set; }
+        public IntersectionStatus? Status { get; set; }
+        public Guid? Id {get; set;}
     }
 }

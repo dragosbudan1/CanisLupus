@@ -1,4 +1,5 @@
 using CanisLupus.Worker.Models;
+using CanisLupus.Worker.Trader;
 
 namespace CanisLupus.Worker.Extensions
 {
@@ -30,6 +31,15 @@ namespace CanisLupus.Worker.Extensions
                 symbolCandle.Orientation,
                 symbolCandle.Close,
                 symbolCandle.Open
+            };
+        }
+
+        public static object ToLoggable(this Order order)
+        {
+            return new {
+                order.Type,
+                order.Spend,
+                order.Amount
             };
         }
     }

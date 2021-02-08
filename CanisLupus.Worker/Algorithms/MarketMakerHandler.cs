@@ -9,6 +9,7 @@ using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Exchange;
 using CanisLupus.Worker.Extensions;
 using CanisLupus.Worker.Models;
+using CanisLupus.Worker.Trader;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -23,92 +24,143 @@ namespace CanisLupus.Worker
     {
         private readonly ILogger<MarketMakerHandler> logger;
         private readonly IBinanceClient binanceClient;
-        private readonly IEventPublisher candleDataPublisher;
-        private readonly IClusterGenerator clusterGenerator;
-        private readonly ISwingPointsGenerator swingPointsGenerator;
+        private readonly IEventPublisher eventPublisher;
         private readonly IWeightedMovingAverageCalculator weightedMovingAverageCalculator;
         private readonly IIntersectionFinder intersectionFinder;
+        private readonly ITradingClient tradingClient;
+        public static List<IntersectionResult> Intersections = new List<IntersectionResult>();
+
+        public static Wallet Wallet;
 
         public MarketMakerHandler(ILogger<MarketMakerHandler> logger,
                                   IBinanceClient binanceClient,
                                   IEventPublisher candleDataPublisher,
-                                  IClusterGenerator clusterGenerator,
-                                  ISwingPointsGenerator swingPointsGenerator,
                                   IWeightedMovingAverageCalculator weightedMovingAverageCalculator,
-                                  IIntersectionFinder intersectionFinder)
+                                  IIntersectionFinder intersectionFinder,
+                                  ITradingClient tradingClient)
         {
             this.logger = logger;
             this.binanceClient = binanceClient;
-            this.candleDataPublisher = candleDataPublisher;
-            this.clusterGenerator = clusterGenerator;
-            this.swingPointsGenerator = swingPointsGenerator;
+            this.eventPublisher = candleDataPublisher;
             this.weightedMovingAverageCalculator = weightedMovingAverageCalculator;
             this.intersectionFinder = intersectionFinder;
+            this.tradingClient = tradingClient;
         }
 
         public async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             //var latestSymbolCandle = await binanceClient.GetLatestCandleAsync("DOGEUSDT");
             var allCandleData = await binanceClient.GetCandlesAsync("DOGEUSDT", 144 + 60, "1m");
-            var candleData = allCandleData.TakeLast(60).ToList();
-            logger.LogInformation("Candle {candle}", candleData.FirstOrDefault().ToLoggableMin());
+            var candleData = allCandleData?.TakeLast(60).ToList();
+            logger.LogInformation("Candle {candle}", candleData?.FirstOrDefault().ToLoggableMin());
 
-            var result = await candleDataPublisher.PublishAsync(new EventRequest()
+            var result = await eventPublisher.PublishAsync(new EventRequest()
             {
                 QueueName = "candleData",
                 Value = JsonConvert.SerializeObject(candleData)
             });
 
-            var highClusters = await clusterGenerator.GenerateClusters(candleData, ClusterType.High);
-            result = await candleDataPublisher.PublishAsync(new EventRequest()
-            {
-                QueueName = "highClusterData",
-                Value = JsonConvert.SerializeObject(highClusters)
-            });
-
-            var lowClusters = await clusterGenerator.GenerateClusters(candleData, ClusterType.Low);
-            result = await candleDataPublisher.PublishAsync(new EventRequest()
-            {
-                QueueName = "lowClusterData",
-                Value = JsonConvert.SerializeObject(lowClusters)
-            });
-
-            var wmaData = weightedMovingAverageCalculator.Calculate(allCandleData, candleData.Count);
-            result = await candleDataPublisher.PublishAsync(new EventRequest
+            var wmaData = weightedMovingAverageCalculator.Calculate(allCandleData, candleData?.Count);
+            result = await eventPublisher.PublishAsync(new EventRequest
             {
                 QueueName = "wmaData",
                 Value = JsonConvert.SerializeObject(wmaData)
             });
 
 
-            var smmaData = weightedMovingAverageCalculator.Calculate(allCandleData.Skip(139).ToList(), candleData.Count);
-            result = await candleDataPublisher.PublishAsync(new EventRequest
+            var smmaData = weightedMovingAverageCalculator.Calculate(allCandleData?.Skip(139).ToList(), candleData?.Count);
+            result = await eventPublisher.PublishAsync(new EventRequest
             {
                 QueueName = "smmaData",
                 Value = JsonConvert.SerializeObject(smmaData)
             });
 
-            var intersections = intersectionFinder.Find(candleData, wmaData.ToArray(), smmaData.ToArray(), candleData.Count);
+            var activeIntersection = Intersections.Where(x => x.Status == IntersectionStatus.Active).FirstOrDefault();
+            // check if we chould sell
+            var openOrder = TradingClient.OpenOrders.FirstOrDefault();
+            if (openOrder != null)
+            {
+                var currentPrice = (decimal)candleData.LastOrDefault().Middle;
+                var targetPrice = openOrder.Price + openOrder.Price * 0.02m;
+                if (targetPrice >= currentPrice)
+                {
+                    await tradingClient.CreateSellOrder(openOrder.Amount, targetPrice);
+                    if (activeIntersection != null)
+                    {
+                        activeIntersection.Status = IntersectionStatus.Finished;
+                    }
+                }
+            }
 
-            // var swingPoints = await swingPointsGenerator.GeneratePoints(listSymbolCandle);
-            // result = await candleDataPublisher.PublishAsync(new EventRequest()
-            // {
-            //     QueueName = "swingPointsData",
-            //     Value = JsonConvert.SerializeObject(swingPoints)
-            // });
-            // get market movement
+            var intersections = intersectionFinder.Find(candleData, wmaData?.ToArray(), smmaData?.ToArray(), candleData?.Count);
 
-            // figure out upward, downward or plateau trend
+            foreach (var item in intersections)
+            {
+                var existingIntersection = Intersections?.Where(x => x.Point.Y == item.Point.Y && x.Type == item.Type).FirstOrDefault();
 
-            // if on downward trend
-            // wait for bottom (or near bottom)
-            // create a buy order
+                if (existingIntersection != null)
+                {
+                    //check if old
+                    if (existingIntersection.Point.X < 55 && existingIntersection.Status == IntersectionStatus.New)
+                    {
+                        existingIntersection.Status = IntersectionStatus.Old;
+                    }
+                }
+                else
+                {
+                    //add intersection as new
+                    item.Id = Guid.NewGuid();
+                    item.Status = IntersectionStatus.New;
+                    Intersections.Add(item);
+                }
+            }
 
-            // if upward trend
-            // and there has been a honored buy order (ie there are funds to sell) (try +1% first)
-            // sell order
+            var newestIntersection = Intersections.Where(x => x.Status == IntersectionStatus.New).OrderByDescending(x => x.Point.X).FirstOrDefault();
 
-            await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
+            if (activeIntersection != null && newestIntersection != null)
+            {
+                // create stop loss if buy order
+                if (newestIntersection.Type == IntersectionType.Downward && activeIntersection.Type == IntersectionType.Upward)
+                {
+                    if (openOrder != null)
+                    {
+                        await tradingClient.CreateSellOrder(openOrder.Amount, (decimal)newestIntersection.Point.Y);
+                        if (activeIntersection != null)
+                        {
+                            activeIntersection.Status = IntersectionStatus.Finished;
+                        }
+                    }
+
+                }
+                // cancel stop loss if uptrend
+
+            }
+            else if (newestIntersection != null && !TradingClient.OpenOrders.Any())
+            {
+                // check to see if can put order in to buy
+                if (newestIntersection.Type == IntersectionType.Upward)
+                {
+                    var price = newestIntersection.Point.Y;
+                    var orderResult = await tradingClient.CreateBuyOrder((decimal)price, 100.0m);
+                    if (orderResult.Success)
+                    {
+                        newestIntersection.Status = IntersectionStatus.Active;
+                    }
+                }
+            }
+
+            var tradingInfo = new
+            {
+                wallet = TradingClient.Wallet,
+                intersections = Intersections,
+                openOrders = TradingClient.OpenOrders
+            };
+
+            await eventPublisher.PublishAsync(new EventRequest
+            {
+                QueueName = "tradingInfo",
+                Value = JsonConvert.SerializeObject(tradingInfo)
+            });
         }
 
         private void ProcessData(List<CandleRawData> candleData, List<Vector2> allWmaData, List<Vector2> allSmmaData, int dataSetCount = 60)
@@ -146,7 +198,7 @@ namespace CanisLupus.Worker
                 }
             }
 
-            candleDataPublisher.PublishAsync(new EventRequest { QueueName = "tradingLogs", Value = JsonConvert.SerializeObject(messages) });
+            eventPublisher.PublishAsync(new EventRequest { QueueName = "tradingLogs", Value = JsonConvert.SerializeObject(messages) });
         }
     }
 }
