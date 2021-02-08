@@ -46,6 +46,7 @@ namespace CanisLupus.Web.Controllers
             var task4 = eventReceiver.ReceiveAsync<List<System.Numerics.Vector2>>("wmaData");
             var task5 = eventReceiver.ReceiveAsync<List<System.Numerics.Vector2>>("smmaData");
             var task6 = eventReceiver.ReceiveAsync<List<string>>("tradingLogs");
+            //var task7 = eventReceiver.ReceiveAsync<string>("tradingInfo");
 
             Task.WaitAll(task1, task2, task3, task4, task5, task6);
 
@@ -55,6 +56,7 @@ namespace CanisLupus.Web.Controllers
             var wmaData = await Task.FromResult(task4.Result);
             var smmaData = await Task.FromResult(task5.Result);
             var tradingLogsData = await Task.FromResult(task6.Result);
+            //var tradingInfoData = await Task.FromResult(task7.Result);
 
             TryMergeMovingAverageData(candleData, wmaData, smmaData);
 

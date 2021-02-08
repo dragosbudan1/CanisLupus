@@ -80,7 +80,8 @@ export class Home extends Component {
       maxChart: 0.46,
       chartViewSwitch: false,
       tradingLogs: ['Waiting for logs'],
-      lastUpdated: null
+      lastUpdated: null,
+      //tradingInfo: 'Waiting for trading info'
     };
 
     this.getWorkerData = this.getWorkerData.bind(this)
@@ -153,7 +154,8 @@ export class Home extends Component {
             highClusterData: highClusterData,
             lowClusterData: lowClusterData,
             lastUpdated: new Date().toUTCString(),
-            tradingLogs: result.data.tradingLogsData
+            tradingLogs: result.data.tradingLogsData,
+            //tradingInfo: result.data.tradingInfo
           })
         }
 
@@ -227,6 +229,9 @@ export class Home extends Component {
   render() {
     return (
       <div>
+        <div>
+          {this.state.tradingInfo}
+        </div>
         <div>
           {this.renderViewControls()}
         </div>
