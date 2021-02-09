@@ -13,13 +13,17 @@ services:
       networks:
       - network
   worker:
-    build: ./CanisLupus.Worker/
+    build:
+      context: ./
+      dockerfile: Dockerfile-Worker
     depends_on: 
       - rabbitmq
     networks:
       - network
   web:
-    build: ./CanisLupus.Web/
+    build:
+      context: ./
+      dockerfile: Dockerfile
     ports:
       - 9200:9200
     expose:

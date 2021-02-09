@@ -1,27 +1,27 @@
 using System.Collections.Generic;
-using System.Numerics;
 using System.Threading.Tasks;
 using CanisLupus.Worker;
 using CanisLupus.Worker.Algorithms;
 using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Exchange;
-using CanisLupus.Worker.Models;
+using CanisLupus.Common.Models;
 using CanisLupus.Worker.Trader;
 using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
 
+
 namespace CanisLupus.Tests
 {
     public class MarketHandlerTests
     {
-        private List<IntersectionResult> intersections = new List<IntersectionResult>();
+        private List<Intersection> intersections = new List<Intersection>();
         private IMarketMakerHandler SUT;
 
         private Mock<ILogger<MarketMakerHandler>> mockLogger;
         private Mock<IBinanceClient> mockBinanceClient;
         private Mock<IEventPublisher> mockEventPublisher;
-        private Mock<IIntersectionFinder> mockIntersectionFinder;
+        private Mock<IIntersectionClient> mockIntersectionClient;
         private Mock<IWeightedMovingAverageCalculator> mockWMACalculator;
         private Mock<ITradingClient> mockTradingClient;
 
@@ -31,45 +31,118 @@ namespace CanisLupus.Tests
             mockLogger = new Mock<ILogger<MarketMakerHandler>>();
             mockBinanceClient = new Mock<IBinanceClient>();
             mockEventPublisher = new Mock<IEventPublisher>();
-            mockIntersectionFinder = new Mock<IIntersectionFinder>();
+            mockIntersectionClient = new Mock<IIntersectionClient>();
             mockTradingClient = new Mock<ITradingClient>();
             mockWMACalculator = new Mock<IWeightedMovingAverageCalculator>();
 
-            var newIntersection = new IntersectionResult
-            {
-                Id = null,
-                Point = new Vector2(57, 0.0745123f),
-                Status = null,
-                Type = IntersectionType.Upward
-            };
-
-            var intersections = new List<IntersectionResult>
-            {
-                newIntersection
-            };
-
-            mockIntersectionFinder.Setup(x => x.Find(It.IsAny<List<CandleRawData>>(), It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
-                .Returns(intersections);
-
-            mockTradingClient.Setup(x => x.CreateBuyOrder(OrderType.Buy, (decimal)newIntersection.Point.Y, 100.0m))
-                .ReturnsAsync(new OrderResult{ Success = true});
+            // mockTradingClient.Setup(x => x.CreateBuyOrder(OrderType.Buy, (decimal)newIntersection.Point.Y, 100.0m))
+            // .ReturnsAsync(new OrderResult{ Success = true});
 
             SUT = new MarketMakerHandler(
                 mockLogger.Object,
                 mockBinanceClient.Object,
                 mockEventPublisher.Object,
                 mockWMACalculator.Object,
-                mockIntersectionFinder.Object,
+                mockIntersectionClient.Object,
                 mockTradingClient.Object
             );
+        }
+
+        [TearDown]
+        public void Teardown()
+        {
+        }
+
+        [Test]
+        public async Task TestAddNewIntersection()
+        {
+            var newIntersection = new Intersection
+            {
+                Id = null,
+                Point = new Vector2(57, 0.0745123m),
+                Status = null,
+                Type = IntersectionType.Upward
+            };
+
+            var intersections = new List<Intersection>
+            {
+                newIntersection
+            };
+
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(), It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
+                .Returns(intersections);
+
+            await SUT.ExecuteAsync(new System.Threading.CancellationToken());
+
+            mockIntersectionClient.Verify(x => x.InsertAsync(It.Is<Intersection>(s =>
+                s.Point == newIntersection.Point && s.Type == s.Type && s.Id == null && s.Status == null)), Times.Once);
+        }
+
+        [Test]
+        public async Task TestUpdateNewToOldIntersection()
+        {
+            var existingIntersection = new Intersection
+            {
+                Id = null,
+                Point = new Vector2(54, 0.0745123m),
+                Status = null,
+                Type = IntersectionType.Upward
+            };
+
+            var intersections = new List<Intersection>
+            {
+                existingIntersection
+            };
+
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(), 
+                It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
+                .Returns(intersections);
+            
+            var dbGeneratedId = "id123";
+
+            mockIntersectionClient.Setup(x => x.FindByIntersectionDetails(It.Is<Intersection>(s => 
+                s.Point == existingIntersection.Point && 
+                s.Type == existingIntersection.Type)))
+                    .ReturnsAsync(new Intersection
+                    {
+                        Id = dbGeneratedId,
+                        Point = existingIntersection.Point,
+                        Type = existingIntersection.Type,
+                        Status = IntersectionStatus.New
+                    });
+
+            await SUT.ExecuteAsync(new System.Threading.CancellationToken());
+
+            mockIntersectionClient.Verify(x => x.InsertAsync(It.IsAny<Intersection>()), Times.Never);
+            mockIntersectionClient.Verify(x => x.Update(It.Is<Intersection>(s => 
+                s.Id == dbGeneratedId &&
+                s.Point == existingIntersection.Point &&
+                s.Type == existingIntersection.Type &&
+                s.Status == IntersectionStatus.Old)), Times.Once);
         }
 
         [Test]
         public async Task TestNewIntersectionAndNoOpenOrders()
         {
+            var newIntersection = new Intersection
+            {
+                Id = null,
+                Point = new Vector2(57, 0.0745123m),
+                Status = null,
+                Type = IntersectionType.Upward
+            };
+
+            var intersections = new List<Intersection>
+            {
+                newIntersection
+            };
+
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(), It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
+                .Returns(intersections);
+
             await SUT.ExecuteAsync(new System.Threading.CancellationToken());
 
-            mockTradingClient.Verify(x => x.CreateBuyOrder(OrderType.Buy, It.IsAny<decimal>(), 100), Times.Once());
+            // mockTradingClient.Verify(x => x.CreateBuyOrder(OrderType.Buy, It.IsAny<decimal>(), 100), Times.Once());
         }
     }
 

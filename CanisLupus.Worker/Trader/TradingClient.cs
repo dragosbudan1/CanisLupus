@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using CanisLupus.Common.Models;
 using CanisLupus.Worker.Extensions;
 using Microsoft.Extensions.Logging;
 
@@ -13,6 +14,7 @@ namespace CanisLupus.Worker.Trader
     public class TradingClient : ITradingClient
     {
         public static List<Order> OpenOrders = new List<Order>();
+        public static List<Order> SellOrders = new List<Order>();
         public static Wallet Wallet = new Wallet() { Amount = 1000.0m };
 
         private readonly ILogger<TradingClient> logger;
@@ -51,7 +53,8 @@ namespace CanisLupus.Worker.Trader
             };
 
             OpenOrders.RemoveAt(0);
-            Wallet.Amount -= order.Spend;
+            SellOrders.Add(order);
+            Wallet.Amount += order.Spend;
 
             var message = $"Created order: {order.ToLoggable()}";
 

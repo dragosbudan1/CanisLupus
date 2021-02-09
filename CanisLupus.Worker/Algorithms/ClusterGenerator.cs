@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using System.Threading.Tasks;
-using CanisLupus.Worker.Models;
+using CanisLupus.Common.Models;
 using Microsoft.Extensions.Logging;
 
 namespace CanisLupus.Worker.Algorithms 
@@ -52,7 +51,7 @@ namespace CanisLupus.Worker.Algorithms
             int time = 0;
             foreach (var dataPoint in orderedData)
             {
-                vectors.Add(new Vector2(time, (float)(type == ClusterType.High ? dataPoint.Top : dataPoint.Bottom)));
+                vectors.Add(new Vector2(time, (type == ClusterType.High ? dataPoint.Top : dataPoint.Bottom)));
                 time++;
             }
             return vectors;

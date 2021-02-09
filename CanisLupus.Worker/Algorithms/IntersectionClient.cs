@@ -1,32 +1,38 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Extensions;
-using CanisLupus.Worker.Models;
+using CanisLupus.Common.Models;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using System.Threading.Tasks;
+using CanisLupus.Common.Database;
 
 namespace CanisLupus.Worker.Algorithms
 {
-    public interface IIntersectionFinder
+    public interface IIntersectionClient
     {
-        List<IntersectionResult> Find(List<CandleRawData> candleData, Vector2[] allWmaData, Vector2[] allSmmaData, int? dataSetCount = null);
+        List<Intersection> ExtractFromChart(List<CandleRawData> candleData, Vector2[] allWmaData, Vector2[] allSmmaData, int? dataSetCount = null);
+        Task<bool> InsertAsync(Intersection intersection);
+        Task<Intersection> FindByIntersectionDetails(Intersection intersection);
+        Task<bool> Update(Intersection intersection);
     }
 
-    public class IntersectionFinder : IIntersectionFinder
+    public class IntersectionClient : IIntersectionClient
     {
-        private readonly ILogger<IntersectionFinder> logger;
+        private readonly ILogger<IntersectionClient> logger;
         private readonly IEventPublisher eventPublisher;
+        private readonly IDbClient dbClient;
 
-        public IntersectionFinder(ILogger<IntersectionFinder> logger, IEventPublisher eventPublisher)
+        public IntersectionClient(ILogger<IntersectionClient> logger, IEventPublisher eventPublisher, IDbClient dbClient)
         {
             this.logger = logger;
             this.eventPublisher = eventPublisher;
+            this.dbClient = dbClient;
         }
 
-        public List<IntersectionResult> Find(List<CandleRawData> candleData, Vector2[] wmaData, Vector2[] smmaData, int? dataSetCount = null)
+        public List<Intersection> ExtractFromChart(List<CandleRawData> candleData, Vector2[] wmaData, Vector2[] smmaData, int? dataSetCount = null)
         {
 
             if (dataSetCount.HasValue)
@@ -37,8 +43,8 @@ namespace CanisLupus.Worker.Algorithms
             // find intersection in current data sample
 
 
-            var resolution = 100.0f;
-            var intersectionList = new List<IntersectionResult>();
+            var resolution = 100.0m;
+            var intersectionList = new List<Intersection>();
             Console.WriteLine($"{wmaData.Length} {smmaData.Length}");
             for (int i = 0; i < wmaData.Length - 1; i++)
             {
@@ -49,8 +55,8 @@ namespace CanisLupus.Worker.Algorithms
                 var diffList = new List<Vector2>();
                 for (int x = 0; x < resolution; x++)
                 {
-                    var wmaAvg = Vector2.Lerp(wmaCurrent, wmaNext, (float)(x + 1) / resolution);
-                    var smaAvg = Vector2.Lerp(smaCurrent, smaNext, (float)(x + 1) / resolution);
+                    var wmaAvg = Vector2.Lerp(wmaCurrent, wmaNext, (decimal)(x + 1) / resolution);
+                    var smaAvg = Vector2.Lerp(smaCurrent, smaNext, (decimal)(x + 1) / resolution);
 
                     var diff = Math.Abs((decimal)(wmaAvg.Y - smaAvg.Y));
                     //Console.WriteLine(diff);
@@ -63,7 +69,7 @@ namespace CanisLupus.Worker.Algorithms
                 }
                 if (diffList.Any())
                 {
-                    intersectionList.Add(new IntersectionResult
+                    intersectionList.Add(new Intersection
                     {
                         Type = GetIntersectionType(smaNext, smaCurrent),
                         Point = new Vector2(i, diffList.Min(x => x.Y))
@@ -92,6 +98,25 @@ namespace CanisLupus.Worker.Algorithms
             eventPublisher.PublishAsync(new EventRequest { QueueName = "tradingLogs", Value = JsonConvert.SerializeObject(messages) });
 
             return intersectionList;
+        }
+
+        public async Task<bool> InsertAsync(Intersection intersection)
+        {
+            var intersectionDb = intersection.ToIntersectionDb(); 
+            var result = await dbClient.InsertAsync(intersection, "Intersections");
+
+            return result != null;
+        }
+
+        public Task<Intersection> FindByIntersectionDetails(Intersection intersection)
+        {
+            throw new NotImplementedException();
+        }
+
+
+        public Task<bool> Update(Intersection intersection)
+        {
+            throw new NotImplementedException();
         }
 
         private IntersectionType GetIntersectionType(Vector2 smaNext, Vector2 smaCurrent)

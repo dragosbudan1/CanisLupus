@@ -1,4 +1,4 @@
-namespace CanisLupus.Worker.Trader
+namespace CanisLupus.Common.Models
 {
     public class Wallet
     {

@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using CanisLupus.Worker.Algorithms;
 using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Exchange;
 using CanisLupus.Worker.Extensions;
-using CanisLupus.Worker.Models;
+using CanisLupus.Common.Models;
 using CanisLupus.Worker.Trader;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -26,9 +25,9 @@ namespace CanisLupus.Worker
         private readonly IBinanceClient binanceClient;
         private readonly IEventPublisher eventPublisher;
         private readonly IWeightedMovingAverageCalculator weightedMovingAverageCalculator;
-        private readonly IIntersectionFinder intersectionFinder;
+        private readonly IIntersectionClient intersectionClient;
         private readonly ITradingClient tradingClient;
-        public static List<IntersectionResult> Intersections = new List<IntersectionResult>();
+        public static List<Intersection> Intersections = new List<Intersection>();
 
         public static Wallet Wallet;
 
@@ -36,14 +35,14 @@ namespace CanisLupus.Worker
                                   IBinanceClient binanceClient,
                                   IEventPublisher candleDataPublisher,
                                   IWeightedMovingAverageCalculator weightedMovingAverageCalculator,
-                                  IIntersectionFinder intersectionFinder,
+                                  IIntersectionClient intersectionFinder,
                                   ITradingClient tradingClient)
         {
             this.logger = logger;
             this.binanceClient = binanceClient;
             this.eventPublisher = candleDataPublisher;
             this.weightedMovingAverageCalculator = weightedMovingAverageCalculator;
-            this.intersectionFinder = intersectionFinder;
+            this.intersectionClient = intersectionFinder;
             this.tradingClient = tradingClient;
         }
 
@@ -60,100 +59,113 @@ namespace CanisLupus.Worker
                 Value = JsonConvert.SerializeObject(candleData)
             });
 
-            var wmaData = weightedMovingAverageCalculator.Calculate(allCandleData, candleData?.Count);
-            result = await eventPublisher.PublishAsync(new EventRequest
+            var wmaData = await weightedMovingAverageCalculator.Calculate(allCandleData, candleData?.Count, "wmaData");
+            var smmaData = await weightedMovingAverageCalculator.Calculate(allCandleData?.Skip(139).ToList(), candleData?.Count, "smmaData");
+
+            var intersections = intersectionClient.ExtractFromChart(candleData, wmaData?.ToArray(), smmaData?.ToArray(), candleData?.Count);
+            
+            // 1. Process intersections
+            // - add NEW intersections
+            // - update NEW -> OLD intersections
+
+            // intersections.ForEach(async (x) => await intersectionClient.InsertAsync(x));
+            
+
+            // foreach(var intersection in intersections)
+            // {
+            //     var existingIntersection = await intersectionClient.FindByIntersectionDetails(intersection);
+
+            //     if(existingIntersection != null)
+            //     {
+            //         if(existingIntersection.Status == IntersectionStatus.New && existingIntersection.Point.X < 55)
+            //         {
+            //             existingIntersection.Status = IntersectionStatus.Old;
+            //             await intersectionClient.Update(existingIntersection);
+            //         }
+            //     }
+            //     else
+            //     {
+            //         await intersectionClient.InsertAsync(intersection);
+            //     }         
+            // }
+
+            // var activeIntersection = Intersections.Where(x => x.Status == IntersectionStatus.Active).FirstOrDefault();
+            // // check if we chould sell
+            // var openOrder = TradingClient.OpenOrders.FirstOrDefault();
+            // if (openOrder != null)
+            // {
+            //     var currentPrice = (decimal)candleData.LastOrDefault().Middle;
+            //     var targetPrice = openOrder.Price + openOrder.Price * 0.02m;
+            //     if (targetPrice >= currentPrice)
+            //     {
+            //         await tradingClient.CreateSellOrder(openOrder.Amount, targetPrice);
+            //         if (activeIntersection != null)
+            //         {
+            //             activeIntersection.Status = IntersectionStatus.Finished;
+            //         }
+            //     }
+            // }
+
+            // foreach (var item in intersections)
+            // {
+            //     var existingIntersection = Intersections?.Where(x => x.Point.Y == item.Point.Y && x.Type == item.Type).FirstOrDefault();
+
+            //     if (existingIntersection != null)
+            //     {
+            //         //check if old
+            //         if (existingIntersection.Point.X < 55 && existingIntersection.Status == IntersectionStatus.New)
+            //         {
+            //             existingIntersection.Status = IntersectionStatus.Old;
+            //         }
+            //     }
+            //     else
+            //     {
+            //         //add intersection as new
+            //         item.Id = Guid.NewGuid();
+            //         item.Status = IntersectionStatus.New;
+            //         Intersections.Add(item);
+            //     }
+            // }
+
+            // var newestIntersection = Intersections.Where(x => x.Status == IntersectionStatus.New).OrderByDescending(x => x.Point.X).FirstOrDefault();
+
+            // if (activeIntersection != null && newestIntersection != null)
+            // {
+            //     // create stop loss if buy order
+            //     if (newestIntersection.Type == IntersectionType.Downward && activeIntersection.Type == IntersectionType.Upward)
+            //     {
+            //         if (openOrder != null)
+            //         {
+            //             await tradingClient.CreateSellOrder(openOrder.Amount, (decimal)newestIntersection.Point.Y);
+            //             if (activeIntersection != null)
+            //             {
+            //                 activeIntersection.Status = IntersectionStatus.Finished;
+            //             }
+            //         }
+
+            //     }
+            //     // cancel stop loss if uptrend
+
+            // }
+            // else if (newestIntersection != null && !TradingClient.OpenOrders.Any())
+            // {
+            //     // check to see if can put order in to buy
+            //     if (newestIntersection.Type == IntersectionType.Upward)
+            //     {
+            //         var price = newestIntersection.Point.Y;
+            //         var orderResult = await tradingClient.CreateBuyOrder((decimal)price, 100.0m);
+            //         if (orderResult.Success)
+            //         {
+            //             newestIntersection.Status = IntersectionStatus.Active;
+            //         }
+            //     }
+            // }
+
+            var tradingInfo = new TradingInfo
             {
-                QueueName = "wmaData",
-                Value = JsonConvert.SerializeObject(wmaData)
-            });
-
-
-            var smmaData = weightedMovingAverageCalculator.Calculate(allCandleData?.Skip(139).ToList(), candleData?.Count);
-            result = await eventPublisher.PublishAsync(new EventRequest
-            {
-                QueueName = "smmaData",
-                Value = JsonConvert.SerializeObject(smmaData)
-            });
-
-            var activeIntersection = Intersections.Where(x => x.Status == IntersectionStatus.Active).FirstOrDefault();
-            // check if we chould sell
-            var openOrder = TradingClient.OpenOrders.FirstOrDefault();
-            if (openOrder != null)
-            {
-                var currentPrice = (decimal)candleData.LastOrDefault().Middle;
-                var targetPrice = openOrder.Price + openOrder.Price * 0.02m;
-                if (targetPrice >= currentPrice)
-                {
-                    await tradingClient.CreateSellOrder(openOrder.Amount, targetPrice);
-                    if (activeIntersection != null)
-                    {
-                        activeIntersection.Status = IntersectionStatus.Finished;
-                    }
-                }
-            }
-
-            var intersections = intersectionFinder.Find(candleData, wmaData?.ToArray(), smmaData?.ToArray(), candleData?.Count);
-
-            foreach (var item in intersections)
-            {
-                var existingIntersection = Intersections?.Where(x => x.Point.Y == item.Point.Y && x.Type == item.Type).FirstOrDefault();
-
-                if (existingIntersection != null)
-                {
-                    //check if old
-                    if (existingIntersection.Point.X < 55 && existingIntersection.Status == IntersectionStatus.New)
-                    {
-                        existingIntersection.Status = IntersectionStatus.Old;
-                    }
-                }
-                else
-                {
-                    //add intersection as new
-                    item.Id = Guid.NewGuid();
-                    item.Status = IntersectionStatus.New;
-                    Intersections.Add(item);
-                }
-            }
-
-            var newestIntersection = Intersections.Where(x => x.Status == IntersectionStatus.New).OrderByDescending(x => x.Point.X).FirstOrDefault();
-
-            if (activeIntersection != null && newestIntersection != null)
-            {
-                // create stop loss if buy order
-                if (newestIntersection.Type == IntersectionType.Downward && activeIntersection.Type == IntersectionType.Upward)
-                {
-                    if (openOrder != null)
-                    {
-                        await tradingClient.CreateSellOrder(openOrder.Amount, (decimal)newestIntersection.Point.Y);
-                        if (activeIntersection != null)
-                        {
-                            activeIntersection.Status = IntersectionStatus.Finished;
-                        }
-                    }
-
-                }
-                // cancel stop loss if uptrend
-
-            }
-            else if (newestIntersection != null && !TradingClient.OpenOrders.Any())
-            {
-                // check to see if can put order in to buy
-                if (newestIntersection.Type == IntersectionType.Upward)
-                {
-                    var price = newestIntersection.Point.Y;
-                    var orderResult = await tradingClient.CreateBuyOrder((decimal)price, 100.0m);
-                    if (orderResult.Success)
-                    {
-                        newestIntersection.Status = IntersectionStatus.Active;
-                    }
-                }
-            }
-
-            var tradingInfo = new
-            {
-                wallet = TradingClient.Wallet,
-                intersections = Intersections,
-                openOrders = TradingClient.OpenOrders
+                Wallet = TradingClient.Wallet,
+                Intersections = Intersections,
+                OpenOrders = TradingClient.OpenOrders
             };
 
             await eventPublisher.PublishAsync(new EventRequest

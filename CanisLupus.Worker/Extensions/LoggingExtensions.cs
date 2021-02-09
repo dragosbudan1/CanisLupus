@@ -1,4 +1,4 @@
-using CanisLupus.Worker.Models;
+using CanisLupus.Common.Models;
 using CanisLupus.Worker.Trader;
 
 namespace CanisLupus.Worker.Extensions
@@ -7,7 +7,7 @@ namespace CanisLupus.Worker.Extensions
     {
         public static object ToLoggable(this CandleRawData symbolCandle)
         {
-            return new 
+            return new
             {
                 symbolCandle.Close,
                 symbolCandle.CloseTime,

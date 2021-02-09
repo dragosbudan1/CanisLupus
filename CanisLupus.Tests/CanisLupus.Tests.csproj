@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CanisLupus.Worker\CanisLupus.csproj" />
+    <ProjectReference Include="..\CanisLupus.Common\CanisLupus.Common.csproj" />
   </ItemGroup>
 
 </Project>

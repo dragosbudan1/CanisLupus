@@ -108,7 +108,7 @@ export class Home extends Component {
   async getWorkerData() {
     axios.get(`/workerData`)
       .then(result => {
-        if (result.data !== null && result.data.candleData !== null && result.data.lowClusterData !== null && result.data.highClusterData !== null) {
+        if (result.data !== null && result.data.candleData !== null) {
           console.log(result.data)
 
           let lineData = result.data.candleData.map((x, i) => {
@@ -129,20 +129,6 @@ export class Home extends Component {
             }
           })
 
-          let highClusterData = result.data.highClusterData.map(x => {
-            return {
-              x: x.x,
-              y: x.y
-            }
-          })
-
-          let lowClusterData = result.data.lowClusterData.map(x => {
-            return {
-              x: x.x,
-              y: x.y
-            }
-          })
-
           var minChart = Math.min(result.data.candleData.map(x => x.bottom))
           var maxChart = Math.max(result.data.candleData.map(x => x.top))
 
@@ -151,8 +137,6 @@ export class Home extends Component {
             candleData: candleData,
             minChart: minChart,
             maxChart: maxChart,
-            highClusterData: highClusterData,
-            lowClusterData: lowClusterData,
             lastUpdated: new Date().toUTCString(),
             tradingLogs: result.data.tradingLogsData,
             //tradingInfo: result.data.tradingInfo

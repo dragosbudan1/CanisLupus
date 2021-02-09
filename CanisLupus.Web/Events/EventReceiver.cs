@@ -51,7 +51,7 @@ namespace CanisLupus.Web.Events
             {
                 await Task.Delay(500);
             }
-
+        
             return JsonConvert.DeserializeObject<T>(message);
         }
     }

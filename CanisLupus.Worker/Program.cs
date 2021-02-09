@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using CanisLupus.Common.Database;
 using CanisLupus.Worker.Algorithms;
 using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Exchange;
@@ -28,10 +29,10 @@ namespace CanisLupus.Worker
                             .AddTransient<IMarketMakerHandler, MarketMakerHandler>()
                             .AddTransient<IEventPublisher, EventPublisher>()
                             .AddTransient<IClusterGenerator, ClusterGenerator>()
-                            .AddTransient<ISwingPointsGenerator, SwingPointsGenerator>()
                             .AddTransient<IWeightedMovingAverageCalculator, WeightedMovingAverageCalculator>()
-                            .AddTransient<IIntersectionFinder, IntersectionFinder>()
-                            .AddTransient<ITradingClient, TradingClient>();
+                            .AddTransient<IIntersectionClient, IntersectionClient>()
+                            .AddTransient<ITradingClient, TradingClient>()
+                            .AddTransient<IDbClient, MongoDbClient>();
                 });
     }
 }

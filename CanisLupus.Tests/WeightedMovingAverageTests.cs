@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using CanisLupus.Worker.Models;
+using CanisLupus.Common.Models;
 using NUnit.Framework;
 
 namespace CanisLupus.Tests
@@ -7,39 +7,39 @@ namespace CanisLupus.Tests
     public class WeightedMovingAverageTests
     {
         List<CandleRawData> testData = new List<CandleRawData>(); 
-        List<double> weights = new List<double>();
+        List<decimal> weights = new List<decimal>();
 
         [SetUp]
         public void Setup()
         {
             testData = new List<CandleRawData>
             {
-                new CandleRawData { Close = 0.05614 },
-                new CandleRawData { Close = 0.05514 },
-                new CandleRawData { Close = 0.05414 },
-                new CandleRawData { Close = 0.05214 },
-                new CandleRawData { Close = 0.05114 },
-                new CandleRawData { Close = 0.05014 },
-                new CandleRawData { Close = 0.05314 },
-                new CandleRawData { Close = 0.05274 },
-                new CandleRawData { Close = 0.05684 },
-                new CandleRawData { Close = 0.05190 },
+                new CandleRawData { Close = 0.05614m },
+                new CandleRawData { Close = 0.05514m },
+                new CandleRawData { Close = 0.05414m },
+                new CandleRawData { Close = 0.05214m },
+                new CandleRawData { Close = 0.05114m },
+                new CandleRawData { Close = 0.05014m },
+                new CandleRawData { Close = 0.05314m },
+                new CandleRawData { Close = 0.05274m },
+                new CandleRawData { Close = 0.05684m },
+                new CandleRawData { Close = 0.05190m },
             };
 
-            weights = new List<double>
+            weights = new List<decimal>
             {
-                1, 2, 3, 4, 5
+                1m, 2m, 3m, 4m, 5m
             };
         }
 
         [Test]
         public void TestWma()
         {
-            var wmaResults = new List<double>();
+            var wmaResults = new List<decimal>();
             for(int i = 0; i < testData.Count - 5; i++)
             {   
-                double top = 0;
-                double bottom = 0;
+                decimal top = 0;
+                decimal bottom = 0;
                 for(int j = 0; j < weights.Count; j++)
                 {
                     top += testData[j + i].Close * weights[j];

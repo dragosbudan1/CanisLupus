@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using CanisLupus.Worker.Extensions;
-using CanisLupus.Worker.Models;
+using CanisLupus.Common.Models;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
@@ -89,10 +89,10 @@ namespace CanisLupus.Worker.Exchange
             return new CandleRawData()
             {
                 OpenTime = UnixTimeStampToDateTime(jarray[0][0].Value<long>()),
-                Open = Convert.ToDouble(jarray[0][1].Value<string>()),
-                High = Convert.ToDouble(jarray[0][2].Value<string>()),
-                Low = Convert.ToDouble(jarray[0][3].Value<string>()),
-                Close = Convert.ToDouble(jarray[0][4].Value<string>()),
+                Open = Convert.ToDecimal(jarray[0][1].Value<string>()),
+                High = Convert.ToDecimal(jarray[0][2].Value<string>()),
+                Low = Convert.ToDecimal(jarray[0][3].Value<string>()),
+                Close = Convert.ToDecimal(jarray[0][4].Value<string>()),
                 Volume = jarray[0][5].Value<string>(),
                 CloseTime = UnixTimeStampToDateTime(jarray[0][6].Value<long>()),
                 QuoteAssetVolume = jarray[0][7].Value<string>(),
@@ -110,10 +110,10 @@ namespace CanisLupus.Worker.Exchange
                 var candle = new CandleRawData()
                 {
                     OpenTime = UnixTimeStampToDateTime(item[0].Value<long>()),
-                    Open = Convert.ToDouble(item[1].Value<string>()),
-                    High = Convert.ToDouble(item[2].Value<string>()),
-                    Low = Convert.ToDouble(item[3].Value<string>()),
-                    Close = Convert.ToDouble(item[4].Value<string>()),
+                    Open = Convert.ToDecimal(item[1].Value<string>()),
+                    High = Convert.ToDecimal(item[2].Value<string>()),
+                    Low = Convert.ToDecimal(item[3].Value<string>()),
+                    Close = Convert.ToDecimal(item[4].Value<string>()),
                     Volume = item[5].Value<string>(),
                     CloseTime = UnixTimeStampToDateTime(item[6].Value<long>()),
                     QuoteAssetVolume = item[7].Value<string>(),

@@ -3,11 +3,13 @@ FROM mcr.microsoft.com/dotnet/core/sdk:3.1 AS build-env
 # Navigate to the “/app” folder (create if not exists)
 WORKDIR /app
 # Copy csproj and download the dependencies listed in that file
-COPY *.csproj ./
-RUN dotnet restore
+COPY ./CanisLupus.Common/*.csproj ./CanisLupus.Common/
+COPY ./CanisLupus.Worker/*.csproj ./CanisLupus.Worker/
+RUN dotnet restore ./CanisLupus.Worker/CanisLupus.csproj
+
 # Copy all files in the project folder
 COPY . ./
-RUN dotnet publish -c Release -o out
+RUN dotnet publish -c Release -o out ./CanisLupus.Worker/CanisLupus.csproj
 # Build runtime image
 FROM mcr.microsoft.com/dotnet/runtime:3.1 AS runtime
 WORKDIR /app

@@ -4,11 +4,11 @@ namespace CanisLupus.Web.Models
 {
     public class WorkerData
     {
-        public double Top { get; set; }
-        public double Bottom { get; set; }
+        public decimal Top { get; set; }
+        public decimal Bottom { get; set; }
         public DateTime OpenTime { get; set; }
         public int Orientation { get; set; }
-        public double Wma { get; set; }
-        public double Smma { get; internal set; }
+        public decimal Wma { get; set; }
+        public decimal Smma { get; internal set; }
     }
 }
