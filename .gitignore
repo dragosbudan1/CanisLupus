@@ -7,7 +7,6 @@
 *.sln.docstates
 
 # Build results
-
 [Dd]ebug/
 [Rr]elease/
 x64/
@@ -387,3 +386,5 @@ _Pvt_Extensions
 
 # FAKE - F# Make
 .fake/
+
+*appsettings.json

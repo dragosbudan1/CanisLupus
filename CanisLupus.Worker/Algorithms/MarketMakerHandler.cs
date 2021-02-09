@@ -27,6 +27,8 @@ namespace CanisLupus.Worker
         private readonly IWeightedMovingAverageCalculator weightedMovingAverageCalculator;
         private readonly IIntersectionClient intersectionClient;
         private readonly ITradingClient tradingClient;
+        private const decimal IntersectionOldThreshold = 55;
+        private const decimal IntersectionFinishedThreshold = 1;
         public static List<Intersection> Intersections = new List<Intersection>();
 
         public static Wallet Wallet;
@@ -68,26 +70,31 @@ namespace CanisLupus.Worker
             // - add NEW intersections
             // - update NEW -> OLD intersections
 
-            // intersections.ForEach(async (x) => await intersectionClient.InsertAsync(x));
-            
+            foreach(var intersection in intersections)
+            {
+                var existingIntersection = await intersectionClient.FindByIntersectionDetails(intersection);
 
-            // foreach(var intersection in intersections)
-            // {
-            //     var existingIntersection = await intersectionClient.FindByIntersectionDetails(intersection);
+                if(existingIntersection != null)
+                {
+                    existingIntersection.Point.X = intersection.Point.X;
 
-            //     if(existingIntersection != null)
-            //     {
-            //         if(existingIntersection.Status == IntersectionStatus.New && existingIntersection.Point.X < 55)
-            //         {
-            //             existingIntersection.Status = IntersectionStatus.Old;
-            //             await intersectionClient.Update(existingIntersection);
-            //         }
-            //     }
-            //     else
-            //     {
-            //         await intersectionClient.InsertAsync(intersection);
-            //     }         
-            // }
+                    if(existingIntersection.Status == IntersectionStatus.New && existingIntersection.Point.X < IntersectionOldThreshold)
+                    {
+                        existingIntersection.Status = IntersectionStatus.Old;
+                    } 
+                    else if (existingIntersection.Status == IntersectionStatus.Old && existingIntersection.Point.X <= IntersectionFinishedThreshold)
+                    {
+                        existingIntersection.Status = IntersectionStatus.Finished;
+                    }
+
+                    await intersectionClient.UpdateAsync(existingIntersection);
+                }
+                else
+                {
+                    intersection.Status = IntersectionStatus.New;
+                    await intersectionClient.InsertAsync(intersection);
+                }         
+            }
 
             // var activeIntersection = Intersections.Where(x => x.Status == IntersectionStatus.Active).FirstOrDefault();
             // // check if we chould sell

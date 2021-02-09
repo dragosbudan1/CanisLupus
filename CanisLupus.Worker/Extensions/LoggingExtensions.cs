@@ -33,6 +33,7 @@ namespace CanisLupus.Worker.Extensions
                 symbolCandle.Open
             };
         }
+        
 
         public static object ToLoggable(this Order order)
         {

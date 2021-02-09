@@ -1,5 +1,5 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 namespace CanisLupus.Common.Database
@@ -11,6 +11,12 @@ namespace CanisLupus.Common.Database
     }
     public class MongoDbClient : IDbClient
     {
+        private readonly DbSettings dbSettings;
+
+        public MongoDbClient(IOptions<DbSettings> dbSettings)
+        {
+            this.dbSettings = dbSettings.Value;
+        }
 
         public async Task<T> InsertAsync<T>(T item, string collectionName)
         {
@@ -21,10 +27,11 @@ namespace CanisLupus.Common.Database
 
         public IMongoCollection<T> GetCollection<T>(string collectionName)
         {
-            var client = new MongoClient("mongodb+srv://canislupusdba:Dtk3sG33LnQPfkcI@canislupus.cnl7z.mongodb.net/canislupus?retryWrites=true&w=majority");
-            var database = client.GetDatabase("CanisLupus");
+            var uri = string.Format(dbSettings.URI, dbSettings.User, dbSettings.Password, dbSettings.DbName);
+            var client = new MongoClient(uri);
+            var database = client.GetDatabase(dbSettings.DbName);
 
-            return database.GetCollection<T>(collectionName);
+            return database.GetCollection<T>($"{collectionName}.{dbSettings.Environment}");
         }
     }
 }

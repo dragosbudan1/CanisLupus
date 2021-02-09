@@ -6,6 +6,7 @@ using CanisLupus.Common.Database;
 using CanisLupus.Worker.Algorithms;
 using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Exchange;
+using CanisLupus.Worker.Infrastructure;
 using CanisLupus.Worker.Trader;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -33,6 +34,8 @@ namespace CanisLupus.Worker
                             .AddTransient<IIntersectionClient, IntersectionClient>()
                             .AddTransient<ITradingClient, TradingClient>()
                             .AddTransient<IDbClient, MongoDbClient>();
+
+                    services.Configure<DbSettings>(hostContext.Configuration.GetSection("DbSettings"));
                 });
     }
 }

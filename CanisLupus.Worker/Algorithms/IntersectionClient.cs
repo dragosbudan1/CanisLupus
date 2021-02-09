@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
 using CanisLupus.Common.Database;
+using System.Linq.Expressions;
+using MongoDB.Driver;
 
 namespace CanisLupus.Worker.Algorithms
 {
@@ -16,7 +18,7 @@ namespace CanisLupus.Worker.Algorithms
         List<Intersection> ExtractFromChart(List<CandleRawData> candleData, Vector2[] allWmaData, Vector2[] allSmmaData, int? dataSetCount = null);
         Task<bool> InsertAsync(Intersection intersection);
         Task<Intersection> FindByIntersectionDetails(Intersection intersection);
-        Task<bool> Update(Intersection intersection);
+        Task<Intersection> UpdateAsync(Intersection intersection);
     }
 
     public class IntersectionClient : IIntersectionClient
@@ -24,6 +26,7 @@ namespace CanisLupus.Worker.Algorithms
         private readonly ILogger<IntersectionClient> logger;
         private readonly IEventPublisher eventPublisher;
         private readonly IDbClient dbClient;
+        public const string IntersectionsCollectionName = "Intersections";
 
         public IntersectionClient(ILogger<IntersectionClient> logger, IEventPublisher eventPublisher, IDbClient dbClient)
         {
@@ -69,11 +72,18 @@ namespace CanisLupus.Worker.Algorithms
                 }
                 if (diffList.Any())
                 {
-                    intersectionList.Add(new Intersection
+                    var intersection = new Intersection
                     {
                         Type = GetIntersectionType(smaNext, smaCurrent),
                         Point = new Vector2(i, diffList.Min(x => x.Y))
-                    });
+                    };
+
+                    var closePreviousIntersection = intersectionList.FirstOrDefault(x => x.Point.X == i - 1);
+
+                    if (intersection.Type != closePreviousIntersection?.Type)
+                    {
+                        intersectionList.Add(intersection);
+                    }
                 }
             }
 
@@ -102,34 +112,46 @@ namespace CanisLupus.Worker.Algorithms
 
         public async Task<bool> InsertAsync(Intersection intersection)
         {
-            var intersectionDb = intersection.ToIntersectionDb(); 
-            var result = await dbClient.InsertAsync(intersection, "Intersections");
-
+            var result = await dbClient.InsertAsync(intersection, IntersectionsCollectionName);
             return result != null;
         }
 
-        public Task<Intersection> FindByIntersectionDetails(Intersection intersection)
+        public async Task<Intersection> FindByIntersectionDetails(Intersection intersection)
         {
-            throw new NotImplementedException();
+            var intersectionCollection = dbClient.GetCollection<Intersection>(IntersectionsCollectionName);
+            Expression<Func<Intersection, bool>> filter = m => (m.Point.Y == intersection.Point.Y && m.Type == intersection.Type);
+            var existingIntersection = (await intersectionCollection.FindAsync<Intersection>(filter)).FirstOrDefault();
+
+            return existingIntersection;
         }
 
 
-        public Task<bool> Update(Intersection intersection)
+        public async Task<Intersection> UpdateAsync(Intersection intersection)
         {
-            throw new NotImplementedException();
+            var collection = dbClient.GetCollection<Intersection>(IntersectionsCollectionName);
+            Expression<Func<Intersection, bool>> filter = m => (m.Id == intersection.Id);
+
+            var update = Builders<Intersection>.Update
+                .Set(m => m.Status, intersection.Status)
+                .Set(m => m.Point.X, intersection.Point.X)
+                .Set(m => m.Type, intersection.Type);
+
+            var updatedIntersection = await collection.FindOneAndUpdateAsync<Intersection>(filter, update);
+            
+            return updatedIntersection;
         }
 
         private IntersectionType GetIntersectionType(Vector2 smaNext, Vector2 smaCurrent)
         {
             var sign = Math.Sign(smaNext.Y - smaCurrent.Y);
 
-            switch(sign)
+            switch (sign)
             {
-                case(-1):
+                case (-1):
                     return IntersectionType.Downward;
-                case(1):
+                case (1):
                     return IntersectionType.Upward;
-                case(0):
+                case (0):
                 default:
                     return IntersectionType.Undefined;
             }
