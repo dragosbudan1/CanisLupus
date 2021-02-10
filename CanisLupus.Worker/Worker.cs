@@ -2,19 +2,18 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using NLog;
 
 namespace CanisLupus.Worker
 {
     public class Worker : BackgroundService
     {
-        private readonly ILogger<Worker> logger;
+        private readonly ILogger logger;
         private readonly IMarketMakerHandler marketMakerHandler;
 
-        public Worker(ILogger<Worker> logger,
-                      IMarketMakerHandler marketMakerHandler)
+        public Worker(IMarketMakerHandler marketMakerHandler)
         {
-            this.logger = logger;
+            this.logger = LogManager.GetCurrentClassLogger();
             this.marketMakerHandler = marketMakerHandler;
         }
 
@@ -22,11 +21,20 @@ namespace CanisLupus.Worker
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                try
+                {
+                    logger.Info("Worker running at: {time}", DateTimeOffset.Now);
 
-                await marketMakerHandler.ExecuteAsync(stoppingToken);
+                    await marketMakerHandler.ExecuteAsync(stoppingToken);
+                    
+                }
+                catch (System.Exception ex)
+                {
 
-                await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);            
+                    logger.Error(ex, ex.Message);
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
             }
         }
     }

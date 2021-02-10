@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using CanisLupus.Common.Models;
-using Microsoft.Extensions.Logging;
+using NLog;
 
 namespace CanisLupus.Worker.Algorithms 
 {
@@ -13,10 +13,10 @@ namespace CanisLupus.Worker.Algorithms
 
     public class ClusterGenerator : IClusterGenerator
     {
-        private readonly ILogger<ClusterGenerator> logger;
-        public ClusterGenerator(ILogger<ClusterGenerator> logger)
+        private readonly ILogger logger;
+        public ClusterGenerator()
         {
-            this.logger = logger;
+            this.logger = LogManager.GetCurrentClassLogger();
         }
 
         public Task<List<Vector2>> GenerateClusters(List<CandleRawData> data, ClusterType type)

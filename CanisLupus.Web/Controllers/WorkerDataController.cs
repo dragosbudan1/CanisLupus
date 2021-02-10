@@ -1,12 +1,10 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using CanisLupus.Common.Models;
 using CanisLupus.Web.Events;
 using CanisLupus.Web.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-
+using NLog;
 
 namespace CanisLupus.Web.Controllers
 {
@@ -20,19 +18,19 @@ namespace CanisLupus.Web.Controllers
     public partial class WorkerDataController : ControllerBase
     {
 
-        private readonly ILogger<WorkerDataController> logger;
+        private readonly ILogger logger;
         private readonly IEventReceiver eventReceiver;
 
-        public WorkerDataController(ILogger<WorkerDataController> logger, IEventReceiver eventReceiver)
+        public WorkerDataController(IEventReceiver eventReceiver)
         {
             this.eventReceiver = eventReceiver;
-            this.logger = logger;
+            this.logger = LogManager.GetCurrentClassLogger();
         }
 
         [HttpPost]
         public Task<bool> Post(SessionInitRequest req)
         {
-            logger.LogInformation("SessionId: {0}", req.Id);
+            logger.Info("SessionId: {0}", req.Id);
             //QueuePool.CreateQueue(req.Id)
             return Task.FromResult(true);
         }
@@ -55,7 +53,7 @@ namespace CanisLupus.Web.Controllers
             var tradingInfoData = await Task.FromResult(task7.Result);
 
             TryMergeMovingAverageData(candleData, wmaData, smmaData);
-
+            logger.Info("returning data");
             return new
             {
                 candleData = candleData,

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using NLog;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
@@ -14,10 +14,10 @@ namespace CanisLupus.Web.Events
     }
     public class EventReceiver : IEventReceiver
     {
-        private readonly ILogger<EventReceiver> logger;
-        public EventReceiver(ILogger<EventReceiver> logger)
+        private readonly ILogger logger;
+        public EventReceiver()
         {
-            this.logger = logger;
+            this.logger = LogManager.GetCurrentClassLogger();
         }
 
         public async Task<T> ReceiveAsync<T>(string exchangeName)
@@ -31,7 +31,7 @@ namespace CanisLupus.Web.Events
                               exchange: exchangeName,
                               routingKey: "");
 
-            logger.LogInformation("Waiting for data {0}: {1}", queueName, exchangeName);
+            logger.Info("Waiting for data {0}: {1}", queueName, exchangeName);
 
             string message = string.Empty;
 
@@ -40,7 +40,7 @@ namespace CanisLupus.Web.Events
             {
                 var body = ea.Body.ToArray();
                 message = Encoding.UTF8.GetString(body);
-                logger.LogInformation("Received from {0}: {1}", exchangeName, queueName);
+                logger.Info("Received from {0}: {1}", exchangeName, queueName);
             };
 
             channel.BasicConsume(queue: queueName,

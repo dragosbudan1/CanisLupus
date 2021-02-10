@@ -4,12 +4,12 @@ using System.Linq;
 using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Extensions;
 using CanisLupus.Common.Models;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
 using CanisLupus.Common.Database;
 using System.Linq.Expressions;
 using MongoDB.Driver;
+using NLog;
 
 namespace CanisLupus.Worker.Algorithms
 {
@@ -23,14 +23,14 @@ namespace CanisLupus.Worker.Algorithms
 
     public class IntersectionClient : IIntersectionClient
     {
-        private readonly ILogger<IntersectionClient> logger;
+        private readonly ILogger logger;
         private readonly IEventPublisher eventPublisher;
         private readonly IDbClient dbClient;
         public const string IntersectionsCollectionName = "Intersections";
 
-        public IntersectionClient(ILogger<IntersectionClient> logger, IEventPublisher eventPublisher, IDbClient dbClient)
+        public IntersectionClient(IEventPublisher eventPublisher, IDbClient dbClient)
         {
-            this.logger = logger;
+            this.logger = LogManager.GetCurrentClassLogger();
             this.eventPublisher = eventPublisher;
             this.dbClient = dbClient;
         }
@@ -44,11 +44,8 @@ namespace CanisLupus.Worker.Algorithms
                 smmaData = smmaData.TakeLast(dataSetCount.Value).ToArray();
             }
             // find intersection in current data sample
-
-
             var resolution = 100.0m;
             var intersectionList = new List<Intersection>();
-            Console.WriteLine($"{wmaData.Length} {smmaData.Length}");
             for (int i = 0; i < wmaData.Length - 1; i++)
             {
                 var wmaCurrent = wmaData[i];
@@ -62,10 +59,8 @@ namespace CanisLupus.Worker.Algorithms
                     var smaAvg = Vector2.Lerp(smaCurrent, smaNext, (decimal)(x + 1) / resolution);
 
                     var diff = Math.Abs((decimal)(wmaAvg.Y - smaAvg.Y));
-                    //Console.WriteLine(diff);
                     if (diff < 0.00001m)
                     {
-                        Console.WriteLine($"Diff {diff} Wma: {wmaAvg} Smma: {smaAvg}");
                         diffList.Add(wmaAvg);
                         //break;
                     }
@@ -92,7 +87,7 @@ namespace CanisLupus.Worker.Algorithms
             {
                 // log no interesections found
                 var message = $"{DateTime.UtcNow} No intersections found between {candleData?.FirstOrDefault().OpenTime} - {candleData?.LastOrDefault().CloseTime}";
-                logger.LogInformation(message);
+                logger.Info(message);
                 messages.Add(message);
             }
             else
@@ -100,7 +95,7 @@ namespace CanisLupus.Worker.Algorithms
                 foreach (var item in intersectionList)
                 {
                     var message = $"{DateTime.UtcNow} Intersection found: {candleData?.ElementAt((int)item.Point.X)?.ToLoggableMin()}, sma: {item.Point.Y}, trend: {item.Type.ToString()}";
-                    logger.LogInformation(message);
+                    logger.Info(message);
                     messages.Add(message);
                 }
             }
@@ -112,6 +107,7 @@ namespace CanisLupus.Worker.Algorithms
 
         public async Task<bool> InsertAsync(Intersection intersection)
         {
+            intersection.CreatedDate = DateTime.UtcNow;
             var result = await dbClient.InsertAsync(intersection, IntersectionsCollectionName);
             return result != null;
         }
@@ -134,7 +130,8 @@ namespace CanisLupus.Worker.Algorithms
             var update = Builders<Intersection>.Update
                 .Set(m => m.Status, intersection.Status)
                 .Set(m => m.Point.X, intersection.Point.X)
-                .Set(m => m.Type, intersection.Type);
+                .Set(m => m.Type, intersection.Type)
+                .Set(m => m.UpdatedDate, DateTime.Now);
 
             var updatedIntersection = await collection.FindOneAndUpdateAsync<Intersection>(filter, update);
             

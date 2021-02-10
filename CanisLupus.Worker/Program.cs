@@ -33,7 +33,8 @@ namespace CanisLupus.Worker
                             .AddTransient<IWeightedMovingAverageCalculator, WeightedMovingAverageCalculator>()
                             .AddTransient<IIntersectionClient, IntersectionClient>()
                             .AddTransient<ITradingClient, TradingClient>()
-                            .AddTransient<IDbClient, MongoDbClient>();
+                            .AddTransient<IDbClient, MongoDbClient>()
+                            .AddTransient<IOrderClient, OrderClient>();
 
                     services.Configure<DbSettings>(hostContext.Configuration.GetSection("DbSettings"));
                 });

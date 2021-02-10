@@ -32,8 +32,7 @@ namespace CanisLupus.Tests
             var dbSettings = Options.Create<DbSettings>(settings);
 
             dbClient = new MongoDbClient(dbSettings);
-            SUT = new IntersectionClient(new Mock<ILogger<IntersectionClient>>().Object,
-                new Mock<IEventPublisher>().Object,
+            SUT = new IntersectionClient(new Mock<IEventPublisher>().Object,
                 dbClient);
         }
 

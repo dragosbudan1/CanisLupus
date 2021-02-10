@@ -1,6 +1,7 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using NLog;
 
 namespace CanisLupus.Common.Database
 {
@@ -12,10 +13,12 @@ namespace CanisLupus.Common.Database
     public class MongoDbClient : IDbClient
     {
         private readonly DbSettings dbSettings;
+        private readonly ILogger logger;
 
         public MongoDbClient(IOptions<DbSettings> dbSettings)
         {
             this.dbSettings = dbSettings.Value;
+            this.logger = LogManager.GetCurrentClassLogger();
         }
 
         public async Task<T> InsertAsync<T>(T item, string collectionName)
@@ -27,11 +30,20 @@ namespace CanisLupus.Common.Database
 
         public IMongoCollection<T> GetCollection<T>(string collectionName)
         {
-            var uri = string.Format(dbSettings.URI, dbSettings.User, dbSettings.Password, dbSettings.DbName);
-            var client = new MongoClient(uri);
-            var database = client.GetDatabase(dbSettings.DbName);
+            try
+            {
+                var uri = string.Format(dbSettings.URI, dbSettings.User, dbSettings.Password, dbSettings.DbName);
+                var client = new MongoClient(uri);
+                var database = client.GetDatabase(dbSettings.DbName);
 
-            return database.GetCollection<T>($"{collectionName}.{dbSettings.Environment}");
+                return database.GetCollection<T>($"{collectionName}.{dbSettings.Environment}");
+            }
+            catch (System.Exception ex)
+            {
+                logger?.Fatal(ex, ex.Message);
+                return null;
+            }
+
         }
     }
 }

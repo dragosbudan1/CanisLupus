@@ -4,8 +4,8 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using CanisLupus.Worker.Extensions;
 using CanisLupus.Common.Models;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
+using NLog;
 
 namespace CanisLupus.Worker.Exchange
 {
@@ -17,11 +17,11 @@ namespace CanisLupus.Worker.Exchange
 
     public class BinanceClient : IBinanceClient
     {
-        private ILogger<BinanceClient> logger;
+        private readonly ILogger logger;
 
-        public BinanceClient(ILogger<BinanceClient> logger)
+        public BinanceClient()
         {
-            this.logger = logger;
+            this.logger = LogManager.GetCurrentClassLogger();
         }
 
         public async Task<List<CandleRawData>> GetCandlesAsync(string pairName, int count, string interval)
@@ -38,13 +38,13 @@ namespace CanisLupus.Worker.Exchange
                 var content = await response.Content.ReadAsStringAsync();
                 var listSymbolCandle = MapResponseToListSymbolCandle(content);
 
-                logger.LogInformation("Binance GetCandlesAsync {pairName} {count} {interval}", pairName, count, interval);
+                logger.Info("Binance GetCandlesAsync {pairName} {count} {interval}", pairName, count, interval);
 
                 return listSymbolCandle;
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error GetLatestCandle", new { pairName });
+                logger.Error(ex, "Error GetLatestCandle", new { pairName });
                 return null;
             }
         }
@@ -71,13 +71,13 @@ namespace CanisLupus.Worker.Exchange
                 var content = await response.Content.ReadAsStringAsync();
                 var symbolCandle = MapResponseToSymbolCandle(content);
 
-                logger.LogInformation("Binance GetLatestCandle {pairName} {info}", pairName, symbolCandle.ToLoggable());
+                logger.Info("Binance GetLatestCandle {pairName} {info}", pairName, symbolCandle.ToLoggable());
 
                 return symbolCandle;
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error GetLatestCandle", new { pairName });
+                logger.Error(ex, "Error GetLatestCandle", new { pairName });
                 return null;
             }
         }

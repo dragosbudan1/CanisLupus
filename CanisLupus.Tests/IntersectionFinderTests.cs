@@ -3,7 +3,6 @@ using System.Linq;
 using CanisLupus.Worker.Algorithms;
 using CanisLupus.Worker.Events;
 using CanisLupus.Common.Models;
-using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
 using CanisLupus.Common.Database;
@@ -17,8 +16,7 @@ namespace CanisLupus.Tests
         [SetUp]
         public void Setup()
         {
-            finder = new IntersectionClient(new Mock<ILogger<IntersectionClient>>().Object,
-                new Mock<IEventPublisher>().Object, new Mock<IDbClient>().Object);
+            finder = new IntersectionClient(new Mock<IEventPublisher>().Object, new Mock<IDbClient>().Object);
         }
 
         [Test]

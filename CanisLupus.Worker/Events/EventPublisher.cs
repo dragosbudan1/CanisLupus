@@ -2,8 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
+using NLog;
 using RabbitMQ.Client;
 
 namespace CanisLupus.Worker.Events
@@ -15,11 +14,11 @@ namespace CanisLupus.Worker.Events
 
     public class EventPublisher : IEventPublisher
     {
-        private readonly ILogger<EventPublisher> logger;
+        private readonly ILogger logger;
 
-        public EventPublisher(ILogger<EventPublisher> logger)
+        public EventPublisher()
         {
-            this.logger = logger;
+            this.logger = LogManager.GetCurrentClassLogger();
         }
 
         public async Task<bool> PublishAsync(EventRequest req)
@@ -43,7 +42,7 @@ namespace CanisLupus.Worker.Events
                                          routingKey: "",
                                          basicProperties: null,
                                          body: body);
-                    logger.LogInformation(" [{0}] Sent {1}", message.Length, req.QueueName);
+                    logger.Info(" [{0}] Sent {1}", message.Length, req.QueueName);
 
                     result = true;
                 });
@@ -53,7 +52,7 @@ namespace CanisLupus.Worker.Events
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, ex.Message);
+                logger.Error(ex, ex.Message);
                 return false;
             }
 

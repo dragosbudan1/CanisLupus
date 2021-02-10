@@ -24,31 +24,11 @@ namespace CanisLupus.Common.Models
         public Vector2 Point { get; set; }
         public IntersectionType Type { get; set; }
         public IntersectionStatus? Status { get; set; }
-
-        [BsonId]
-        [BsonRepresentation(BsonType.ObjectId)]
-        public string Id {get; set;}
-    }
-
-    public class IntersectionDb
-    {
-        [BsonId]
-        [BsonRepresentation(BsonType.ObjectId)]
-        public string Id {get; set;}
         
-        [BsonElement("x")]
-        public decimal X { get; set; }
-
-        [BsonElement("y")]
-        public decimal Y { get; set; }
-
-        [BsonElement("type")]
-        public string Type { get; set; }
-
-        [BsonElement("status")]
-        public string Status { get; set; }
-
-        [BsonElement("date")]
-        public BsonDateTime Date { get; set; }
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string Id {get; set;}
+        public DateTime? CreatedDate { get; set; }
+        public DateTime? UpdatedDate { get; set; }
     }
 }

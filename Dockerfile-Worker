@@ -5,10 +5,12 @@ WORKDIR /app
 # Copy csproj and download the dependencies listed in that file
 COPY ./CanisLupus.Common/*.csproj ./CanisLupus.Common/
 COPY ./CanisLupus.Worker/*.csproj ./CanisLupus.Worker/
+
 RUN dotnet restore ./CanisLupus.Worker/CanisLupus.csproj
 
 # Copy all files in the project folder
 COPY . ./
+COPY ./CanisLupus.Worker/appsettings.Prod.json ./CanisLupus.Worker/appsettings.json
 RUN dotnet publish -c Release -o out ./CanisLupus.Worker/CanisLupus.csproj
 # Build runtime image
 FROM mcr.microsoft.com/dotnet/runtime:3.1 AS runtime
