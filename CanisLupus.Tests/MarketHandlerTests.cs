@@ -6,7 +6,6 @@ using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Exchange;
 using CanisLupus.Common.Models;
 using CanisLupus.Worker.Trader;
-using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
 
@@ -41,7 +40,8 @@ namespace CanisLupus.Tests
                 mockWMACalculator.Object,
                 mockIntersectionClient.Object,
                 mockTradingClient.Object,
-                mockOrderClient.Object
+                mockOrderClient.Object,
+                new Mock<IWalletClient>().Object
             );
         }
 
@@ -68,14 +68,14 @@ namespace CanisLupus.Tests
 
             mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(), It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
                 .Returns(intersections);
-            
-            mockIntersectionClient.Setup(x => x.InsertAsync(It.Is<Intersection>(s => s.Point.Y == newestIntersection.Point.Y && s.Type == newestIntersection.Type)))
-                .ReturnsAsync(true);
 
             await SUT.ExecuteAsync(new System.Threading.CancellationToken());
 
             mockIntersectionClient.Verify(x => x.InsertAsync(It.Is<Intersection>(s =>
-                s.Point == newestIntersection.Point && s.Type == s.Type && s.Id == null && s.Status == IntersectionStatus.New)), Times.Once);
+                s.Point == newestIntersection.Point &&
+                s.Type == s.Type && s.Id == null &&
+                 s.Status == IntersectionStatus.New
+                 )), Times.Once);
         }
 
         [Test]
@@ -229,7 +229,7 @@ namespace CanisLupus.Tests
 
             await SUT.ExecuteAsync(new System.Threading.CancellationToken());
 
-            mockOrderClient.Verify(x => x.CancelOrder(It.Is<Order>(m => m.Id == openOrder.Id)), Times.Once);
+            mockOrderClient.Verify(x => x.UpdateOrderAsync(It.Is<string>(s => s == openOrder.Id), It.Is<OrderStatus>(s => s == OrderStatus.Cancelled)), Times.Once);
         }
 
         [Test]
@@ -269,7 +269,7 @@ namespace CanisLupus.Tests
 
             await SUT.ExecuteAsync(new System.Threading.CancellationToken());
 
-            mockOrderClient.Verify(x => x.CancelOrder(It.Is<Order>(m => m.Id == openOrder.Id)), Times.Once);
+            mockOrderClient.Verify(x => x.UpdateOrderAsync(It.Is<string>(s => s == openOrder.Id), It.Is<OrderStatus>(s => s == OrderStatus.Cancelled)), Times.Once);
         }
 
         [Test]
@@ -302,7 +302,7 @@ namespace CanisLupus.Tests
                 Price = price,
                 Spend = spend,
                 ProfitPercentage = 2,
-                Amount = price * spend               
+                Amount = spend / price
             };
 
             mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(), It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
@@ -310,12 +310,12 @@ namespace CanisLupus.Tests
 
             await SUT.ExecuteAsync(new System.Threading.CancellationToken());
 
-            mockOrderClient.Verify(x => x.CreateOrder(It.Is<Order>(o => 
+            mockOrderClient.Verify(x => x.CreateOrder(It.Is<Order>(o =>
                 o.Price == newBuyOrder.Price &&
                 o.Amount == newBuyOrder.Amount &&
                 o.ProfitPercentage == newBuyOrder.ProfitPercentage &&
                 o.Spend == newBuyOrder.Spend &&
-                o.Type == newBuyOrder.Type)));
+                o.Type == newBuyOrder.Type)), Times.Once);
         }
 
         [Test]
@@ -339,13 +339,33 @@ namespace CanisLupus.Tests
                 OrderId = linkedOrder.Id,
                 Id = "122334",
                 TradeStatus = TradeStatus.Active,
-                TradeType = TradeType.Buy 
+                TradeType = TradeType.Buy
             };
 
-            var activeTrades = new List<Trade>(){ activeTrade };
+            var activeTrades = new List<Trade>() { activeTrade };
+
+            var latestCandle = new CandleRawData()
+            {
+                Open = price + (price * (5 / 100)),
+                Close = price
+            };
+
+            var newestIntersection = new Intersection()
+            {
+                Type = IntersectionType.Upward
+            };
+
+            mockBinanceClient.Setup(x => x.GetCandlesAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>()))
+                .ReturnsAsync(new List<CandleRawData>() { latestCandle });
 
             mockTradingClient.Setup(x => x.FindActiveTrades())
                 .ReturnsAsync(activeTrades);
+
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(), It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
+                .Returns(new List<Intersection>() { newestIntersection });
+
+            mockOrderClient.Setup(x => x.FindOrderById(It.Is<string>(s => s == linkedOrder.Id)))
+                .ReturnsAsync(linkedOrder);
 
             await SUT.ExecuteAsync(new System.Threading.CancellationToken());
 
@@ -354,16 +374,154 @@ namespace CanisLupus.Tests
                 Type = OrderType.Sell,
                 Price = linkedOrder.TargetPrice,
                 Amount = linkedOrder.Amount,
-                Spend = linkedOrder.Amount * linkedOrder.TargetPrice,
-                Status = OrderStatus.Open
+                Spend = linkedOrder.Amount * linkedOrder.TargetPrice
             };
-            mockOrderClient.Verify(x => x.CreateOrder(It.Is<Order>(s => 
+
+            mockOrderClient.Verify(x => x.CreateOrder(It.Is<Order>(s =>
                 s.Amount == sellOrder.Amount &&
                 s.Price == sellOrder.Price &&
                 s.Spend == sellOrder.Spend &&
-                s.Status == sellOrder.Status)), Times.Once);
+                s.Type == OrderType.Sell)), Times.Once);
+        }
+
+        [Test]
+        public async Task TestWhenActiveTradeAndStopLossReached()
+        {
+            var price = 1.0m;
+            var spend = 100;
+            var linkedOrder = new Order()
+            {
+                Id = "1233",
+                Amount = spend / price,
+                Price = price,
+                Spend = spend,
+                ProfitPercentage = 2,
+                StopLossPercentage = 5,
+                Status = OrderStatus.Filled,
+                Type = OrderType.Buy
+            };
+
+            var activeTrade = new Trade()
+            {
+                OrderId = linkedOrder.Id,
+                Id = "122334",
+                TradeStatus = TradeStatus.Active,
+                TradeType = TradeType.Buy
+            };
+
+            var activeTrades = new List<Trade>() { activeTrade };
+
+            var latestCandle = new CandleRawData()
+            {
+                Open = 0.99m,
+                Close = 0.98m
+            };
+
+            var newestIntersection = new Intersection()
+            {
+                Type = IntersectionType.Upward
+            };
+
+            mockBinanceClient.Setup(x => x.GetCandlesAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>()))
+                .ReturnsAsync(new List<CandleRawData>() { latestCandle });
+
+            mockTradingClient.Setup(x => x.FindActiveTrades())
+                .ReturnsAsync(activeTrades);
+
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(), It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
+                .Returns(new List<Intersection>() { newestIntersection });
+
+            mockOrderClient.Setup(x => x.FindOrderById(It.Is<string>(s => s == linkedOrder.Id)))
+                .ReturnsAsync(linkedOrder);
+
+            await SUT.ExecuteAsync(new System.Threading.CancellationToken());
+
+            var sellOrder = new Order()
+            {
+                Type = OrderType.Sell,
+                Price = linkedOrder.StopLossPrice,
+                Amount = linkedOrder.Amount,
+                Spend = linkedOrder.Amount * linkedOrder.StopLossPrice
+            };
+
+            mockOrderClient.Verify(x => x.CreateOrder(It.Is<Order>(s =>
+                s.Type == OrderType.Sell)), Times.Once);
+        }
+
+        [Test]
+        public async Task TestFakeTradingEngineFillOpenBuyOrderAndCreateActiveTrade()
+        {
+            var dbGeneratedId = "id123";
+            var openOrder = new Order()
+            {
+                Amount = 10.0m,
+                Spend = 100.0m,
+                Price = 1.10m,
+                Status = OrderStatus.Open,
+                Type = OrderType.Buy,
+                Id = dbGeneratedId
+            };
+
+            var latestCandle = new CandleRawData()
+            {
+                Open = 0.99m,
+                Close = 0.98m
+            };
+
+            mockBinanceClient.Setup(x => x.GetCandlesAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>()))
+                .ReturnsAsync(new List<CandleRawData>() { latestCandle });
+
+            mockOrderClient.Setup(x => x.FindOpenOrders())
+                .ReturnsAsync(new List<Order> { openOrder });
+
+            await SUT.ExecuteAsync(new System.Threading.CancellationToken());
+
+            mockOrderClient.Verify(x => x.UpdateOrderAsync(It.Is<string>(s => s == dbGeneratedId), It.Is<OrderStatus>(s => s == OrderStatus.Filled)), Times.Once);
+            mockTradingClient.Verify(x => x.CreateActiveTrade(It.Is<Trade>(s => s.OrderId == dbGeneratedId && s.TradeStatus == TradeStatus.Active)), Times.Once);
+        }
+
+        [Test]
+        public async Task TestFakeTradingEngineFillOpenSellOrderAndCloseActiveTrade()
+        {
+            var dbGeneratedId = "id123";
+            var openOrder = new Order()
+            {
+                Amount = 10.0m,
+                Spend = 100.0m,
+                Price = 0.10m,
+                Status = OrderStatus.Open,
+                Type = OrderType.Sell,
+                Id = dbGeneratedId
+            };
+
+            var latestCandle = new CandleRawData()
+            {
+                Open = 0.99m,
+                Close = 0.98m
+            };
+
+            mockBinanceClient.Setup(x => x.GetCandlesAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>()))
+                .ReturnsAsync(new List<CandleRawData>() { latestCandle });
+
+            mockOrderClient.Setup(x => x.FindOpenOrders())
+                .ReturnsAsync(new List<Order> { openOrder });
+
+            var trade = new Trade
+            {
+                Id = "someId",
+                OrderId = openOrder.Id,
+                StartSpend = openOrder.Spend,
+                TradeStatus = TradeStatus.Active,
+                TradeType = TradeType.Buy
+            };
+
+            mockTradingClient.Setup(x => x.FindActiveTrades())
+                .ReturnsAsync(new List<Trade> { trade });
+
+            await SUT.ExecuteAsync(new System.Threading.CancellationToken());
+
+            mockOrderClient.Verify(x => x.UpdateOrderAsync(It.Is<string>(s => s == dbGeneratedId), It.Is<OrderStatus>(s => s == OrderStatus.Filled)), Times.Once);
+            mockTradingClient.Verify(x => x.CloseTrade(It.Is<string>(s => s == trade.Id), It.Is<Order>(s => s.Id == dbGeneratedId)), Times.Once);
         }
     }
-
-
 }

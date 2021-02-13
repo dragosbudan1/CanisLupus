@@ -1,24 +1,36 @@
 using System;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 
 namespace CanisLupus.Common.Models
 {
     public class Order
     {
-        
-        [BsonId]
-        [BsonRepresentation(BsonType.ObjectId)]
-        public string Id {get; set;}
+        public Order()
+        {
+            Id = Guid.NewGuid().ToString();
+        }
+
+        public string Id { get; set; }
         public DateTime? CreatedDate { get; set; }
         public DateTime? UpdatedDate { get; set; }
-        public OrderType Type { get; set; }
         public decimal Amount { get; set; }
         public decimal Spend { get; set; }
         public decimal Price { get; set; }
         public decimal TargetPrice => Price + (Price * (ProfitPercentage / 100));
+        public decimal StopLossPrice => Price - (Price * (StopLossPercentage / 100));
         public decimal ProfitPercentage { get; set; }
+        public decimal StopLossPercentage { get; set; }
+
+        [JsonConverter(typeof(StringEnumConverter))]
+        [BsonRepresentation(BsonType.String)]
         public OrderStatus Status { get; set; }
+
+        [JsonConverter(typeof(StringEnumConverter))]
+        [BsonRepresentation(BsonType.String)]
+        public OrderType Type { get; set; }
     }
 
     public enum OrderStatus

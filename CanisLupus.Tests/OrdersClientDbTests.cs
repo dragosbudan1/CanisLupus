@@ -37,7 +37,7 @@ namespace CanisLupus.Tests
             SUT = new OrderClient(dbClient);
         }
 
-        // [TearDown]
+        [TearDown]
         public async Task TearDown()
         {
             var collection = dbClient.GetCollection<Order>(OrderClient.OrdersCollectionName);
@@ -57,14 +57,34 @@ namespace CanisLupus.Tests
                 Spend = 1000
             };
 
-            await SUT.CreateOrder(order);
-
-            var openOrder = (await SUT.FindOpenOrders()).FirstOrDefault();
-
-            var result = await SUT.CancelOrder(openOrder);
+            var orderResult = await SUT.CreateOrder(order);
+            var resultId = await SUT.UpdateOrderAsync(orderResult.Id, OrderStatus.Cancelled);
+            var result = await SUT.FindOrderById(resultId);
 
             Assert.IsNotNull(result);
-            Assert.AreEqual(result.Id, openOrder.Id);
+            Assert.AreEqual(result.Id, order.Id);
+            Assert.AreEqual(result.Status, OrderStatus.Cancelled);
+        }
+
+        [Test]
+        public async Task FillOrdersTest()
+        {
+            var order = new Order()
+            {
+                Amount = 12.456m,
+                Price = 12.456m,
+                ProfitPercentage = 2,
+                Type = OrderType.Buy,
+                Spend = 1000
+            };
+
+            var orderResult = await SUT.CreateOrder(order);
+            var resultId = await SUT.UpdateOrderAsync(orderResult.Id, OrderStatus.Filled);
+            var result = await SUT.FindOrderById(resultId);
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(result.Id, order.Id);
+            Assert.AreEqual(result.Status, OrderStatus.Filled);
         }
 
         [Test]
@@ -76,19 +96,59 @@ namespace CanisLupus.Tests
                 Price = 12.456m,
                 ProfitPercentage = 2,
                 Type = OrderType.Buy,
-                Spend = 1000
+                Spend = 1000,
+                StopLossPercentage = 10
             };
 
             var result = await SUT.CreateOrder(order);
+            var findResult = await SUT.FindOrderById(result.Id);
 
-            Assert.IsNotNull(result);
-            Assert.AreEqual(result.Type, order.Type);
+            Assert.IsNotNull(findResult);
+            Assert.AreEqual(findResult.Type, OrderType.Buy);
+            Assert.AreEqual(findResult.Status, OrderStatus.Open);
         }
 
         [Test]
-        public async Task UpdateIntersectionTest()
+        public async Task FindOpenOrdersTest()
         {
-            
+            var openOrder1 = new Order()
+            {
+                Amount = 12.456m,
+                Price = 12.456m,
+                ProfitPercentage = 2,
+                Type = OrderType.Buy,
+                Spend = 1000,
+                StopLossPercentage = 10
+            };
+
+            var openOrder2 = new Order()
+            {
+                Amount = 12.456m,
+                Price = 12.456m,
+                ProfitPercentage = 2,
+                Type = OrderType.Buy,
+                Spend = 1000,
+                StopLossPercentage = 10
+            };
+
+            var closedOrder = new Order()
+            {
+                Amount = 12.456m,
+                Price = 12.456m,
+                ProfitPercentage = 2,
+                Type = OrderType.Buy,
+                Spend = 1000,
+                StopLossPercentage = 10
+            };
+
+            await SUT.CreateOrder(openOrder1);
+            await SUT.CreateOrder(openOrder2);
+            await SUT.CreateOrder(closedOrder);
+            await SUT.UpdateOrderAsync(closedOrder.Id, OrderStatus.Cancelled);
+            var orders = await SUT.FindOpenOrders();
+
+            Assert.IsNotNull(orders);
+            Assert.AreEqual(orders.Count, 2);
         }
     }
 }

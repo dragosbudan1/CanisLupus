@@ -23,7 +23,6 @@ namespace CanisLupus.Web
                     webBuilder
                         .UseStartup<Startup>()
                         .UseUrls("http://*:9200/");
-
                 });
     }
 }

@@ -19,6 +19,7 @@ namespace CanisLupus.Worker.Algorithms
         Task<bool> InsertAsync(Intersection intersection);
         Task<Intersection> FindByIntersectionDetails(Intersection intersection);
         Task<Intersection> UpdateAsync(Intersection intersection);
+        Task<List<Intersection>> FindIntersectionsByStatus(IntersectionStatus status);
     }
 
     public class IntersectionClient : IIntersectionClient
@@ -152,6 +153,17 @@ namespace CanisLupus.Worker.Algorithms
                 default:
                     return IntersectionType.Undefined;
             }
+        }
+
+        public async Task<List<Intersection>> FindIntersectionsByStatus(IntersectionStatus status)
+        {
+            var collection = dbClient.GetCollection<Intersection>(IntersectionsCollectionName);
+            Expression<Func<Intersection, bool>> filter = m => (m.Status == status);
+
+            var result = (await collection.FindAsync<Intersection>(filter)).ToList();
+
+            return result;
+            
         }
     }
 }

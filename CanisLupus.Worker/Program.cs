@@ -34,9 +34,12 @@ namespace CanisLupus.Worker
                             .AddTransient<IIntersectionClient, IntersectionClient>()
                             .AddTransient<ITradingClient, TradingClient>()
                             .AddTransient<IDbClient, MongoDbClient>()
-                            .AddTransient<IOrderClient, OrderClient>();
+                            .AddTransient<IOrderClient, OrderClient>()
+                            .AddTransient<IFakeTradingEngine, FakeTradingEngine>()
+                            .AddTransient<IWalletClient, WalletClient>();
 
-                    services.Configure<DbSettings>(hostContext.Configuration.GetSection("DbSettings"));
+                    services.Configure<DbSettings>(hostContext.Configuration.GetSection("DbSettings"))
+                            .Configure<BinanceSettings>(hostContext.Configuration.GetSection("BinanceSettings"));
                 });
     }
 }

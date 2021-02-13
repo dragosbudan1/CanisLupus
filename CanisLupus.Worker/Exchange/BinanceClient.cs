@@ -6,22 +6,32 @@ using CanisLupus.Worker.Extensions;
 using CanisLupus.Common.Models;
 using Newtonsoft.Json.Linq;
 using NLog;
+using System.Text;
+using System.Security.Cryptography;
+using Microsoft.Extensions.Options;
 
 namespace CanisLupus.Worker.Exchange
 {
-   public interface IBinanceClient
+    public interface IBinanceClient
     {
         Task<CandleRawData> GetLatestCandleAsync(string pairName);
         Task<List<CandleRawData>> GetCandlesAsync(string pairName, int count, string interval);
+        Task<BinanceOrderResponse> CreateOrder(BinanceOrderRequest request);
+        Task<List<BinanceOrderResponse>> GetOpenOrders(string symbol);
+        Task<List<BinanceOrderResponse>> CancelAllOrders(string symbol);
+        Task<BinanceOrderResponse> CancelOrder(string symbol, string orderId);
+        Task<BinanceOrderResponse> GetOrder(string symbol, string clientOrderId);
     }
 
     public class BinanceClient : IBinanceClient
     {
         private readonly ILogger logger;
+        private readonly BinanceSettings settings;
 
-        public BinanceClient()
+        public BinanceClient(IOptions<BinanceSettings> settings)
         {
             this.logger = LogManager.GetCurrentClassLogger();
+            this.settings = settings.Value;
         }
 
         public async Task<List<CandleRawData>> GetCandlesAsync(string pairName, int count, string interval)
@@ -32,11 +42,11 @@ namespace CanisLupus.Worker.Exchange
                     throw new ArgumentNullException(nameof(pairName));
 
                 var client = new HttpClient();
-                var response = await client.GetAsync($"https://api.binance.com/api/v3/klines?symbol={pairName}&interval={interval}&limit={count}");
+                var response = await client.GetAsync($"{settings.TestUrl}/klines?symbol={pairName}&interval={interval}&limit={count}");
                 response.EnsureSuccessStatusCode();
 
                 var content = await response.Content.ReadAsStringAsync();
-                var listSymbolCandle = MapResponseToListSymbolCandle(content);
+                var listSymbolCandle = BinanceHelpers.MapResponseToListSymbolCandle(content);
 
                 logger.Info("Binance GetCandlesAsync {pairName} {count} {interval}", pairName, count, interval);
 
@@ -47,14 +57,6 @@ namespace CanisLupus.Worker.Exchange
                 logger.Error(ex, "Error GetLatestCandle", new { pairName });
                 return null;
             }
-        }
-
-        private static DateTime UnixTimeStampToDateTime(double unixTimeStamp)
-        {
-            // Unix timestamp is seconds past epoch
-            System.DateTime dtDateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
-            dtDateTime = dtDateTime.AddMilliseconds(unixTimeStamp).ToLocalTime();
-            return dtDateTime;
         }
 
         public async Task<CandleRawData> GetLatestCandleAsync(string pairName)
@@ -69,7 +71,7 @@ namespace CanisLupus.Worker.Exchange
                 response.EnsureSuccessStatusCode();
 
                 var content = await response.Content.ReadAsStringAsync();
-                var symbolCandle = MapResponseToSymbolCandle(content);
+                var symbolCandle = BinanceHelpers.MapResponseToSymbolCandle(content);
 
                 logger.Info("Binance GetLatestCandle {pairName} {info}", pairName, symbolCandle.ToLoggable());
 
@@ -82,49 +84,173 @@ namespace CanisLupus.Worker.Exchange
             }
         }
 
-        private CandleRawData MapResponseToSymbolCandle(string contentResponse)
+        public async Task<List<BinanceOrderResponse>> GetOpenOrders(string symbol)
         {
-            var jarray = JArray.Parse(contentResponse);
-
-            return new CandleRawData()
+            try
             {
-                OpenTime = UnixTimeStampToDateTime(jarray[0][0].Value<long>()),
-                Open = Convert.ToDecimal(jarray[0][1].Value<string>()),
-                High = Convert.ToDecimal(jarray[0][2].Value<string>()),
-                Low = Convert.ToDecimal(jarray[0][3].Value<string>()),
-                Close = Convert.ToDecimal(jarray[0][4].Value<string>()),
-                Volume = jarray[0][5].Value<string>(),
-                CloseTime = UnixTimeStampToDateTime(jarray[0][6].Value<long>()),
-                QuoteAssetVolume = jarray[0][7].Value<string>(),
-                NumberOfTrades = jarray[0][8].Value<long>(),
-            };
-        }
+                var url = $"{settings.TestUrl}/openOrders";
+                var timestamp = BinanceHelpers.GetUnixTimestamp();
+                var queryString = BinanceHelpers.GetOpenOrderQueryString(timestamp, symbol);
+                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.TestSecretKey);
+                var requestUri = $"{url}?{queryString}&signature={hmac}";
 
-        private List<CandleRawData> MapResponseToListSymbolCandle(string contentResponse)
-        {
-            var jarray = JArray.Parse(contentResponse);
-            var list = new List<CandleRawData>();
+                var httpRequest = new HttpRequestMessage(HttpMethod.Get, requestUri);
+                httpRequest.Headers.Add("X-MBX-APIKEY", settings.TestApiKey);
 
-            foreach (var item in jarray.Children())
-            {
-                var candle = new CandleRawData()
-                {
-                    OpenTime = UnixTimeStampToDateTime(item[0].Value<long>()),
-                    Open = Convert.ToDecimal(item[1].Value<string>()),
-                    High = Convert.ToDecimal(item[2].Value<string>()),
-                    Low = Convert.ToDecimal(item[3].Value<string>()),
-                    Close = Convert.ToDecimal(item[4].Value<string>()),
-                    Volume = item[5].Value<string>(),
-                    CloseTime = UnixTimeStampToDateTime(item[6].Value<long>()),
-                    QuoteAssetVolume = item[7].Value<string>(),
-                    NumberOfTrades = item[8].Value<long>(),
-                };
+                using var client = new HttpClient();
+                var response = await client.SendAsync(httpRequest);
+                response.EnsureSuccessStatusCode();
 
-                list.Add(candle);
+                var content = await response.Content.ReadAsStringAsync();
+                var result = BinanceHelpers.MapToListBinanceOrderResponse(content);
+                logger.Error($"Log Orders: {content}");
+
+                return result;
             }
-
-            return list;
+            catch (System.Exception ex)
+            {
+                logger.Error(ex, "Error get open orders");
+                return null;
+            }
         }
+
+        public async Task<BinanceOrderResponse> CreateOrder(BinanceOrderRequest request)
+        {
+            try
+            {
+                var url = $"{settings.TestUrl}/order";
+                var timestamp = BinanceHelpers.GetUnixTimestamp();
+                var queryString = BinanceHelpers.GetTradeQueryString(timestamp, request);
+                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.TestSecretKey);
+                var requestUri = $"{url}?{queryString}&signature={hmac}";
+
+                HttpRequestMessage httpRequest = new HttpRequestMessage(HttpMethod.Post, requestUri);
+                httpRequest.Headers.Add("X-MBX-APIKEY", settings.TestApiKey);
+
+                using var client = new HttpClient();
+                var response = await client.SendAsync(httpRequest);
+                var content = await response.Content.ReadAsStringAsync();
+                logger.Info($"Consntnet: {content}");
+                response.EnsureSuccessStatusCode();
+                if(content == null)
+                {
+                    logger.Error($"Error trade, no content {response}");
+                    return null;
+                }
+                
+                var binanceOrderResponse = BinanceHelpers.MapToBinanceOrderResponse(content);
+                return binanceOrderResponse;
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, $"Error trade {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<List<BinanceOrderResponse>> CancelAllOrders(string symbol)
+        {
+            try
+            {
+                var url = $"{settings.TestUrl}/openOrders";
+                var timestamp = BinanceHelpers.GetUnixTimestamp();
+                var queryString = BinanceHelpers.GetOpenOrderQueryString(timestamp, symbol);
+                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.TestSecretKey);
+                var requestUri = $"{url}?{queryString}&signature={hmac}";
+
+                var httpRequest = new HttpRequestMessage(HttpMethod.Delete, requestUri);
+                httpRequest.Headers.Add("X-MBX-APIKEY", settings.TestApiKey);
+
+                using var client = new HttpClient();
+                var response = await client.SendAsync(httpRequest);
+
+                var content = await response.Content.ReadAsStringAsync();
+                var result = BinanceHelpers.MapToListBinanceOrderResponse(content);
+                logger.Error($"Log Orders: {content}");
+
+                return result;
+            }
+            catch (System.Exception ex)
+            {
+                logger.Error(ex, "Error cancel open orders");
+                return null;
+            }
+        }
+
+        public async Task<BinanceOrderResponse> CancelOrder(string symbol, string orderId)
+        {
+            try
+            {
+                var url = $"{settings.TestUrl}/order";
+                var timestamp = BinanceHelpers.GetUnixTimestamp();
+                var queryString = BinanceHelpers.GetCancelOrderQueryString(timestamp, symbol, orderId);
+                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.TestSecretKey);
+                var requestUri = $"{url}?{queryString}&signature={hmac}";
+
+                var httpRequest = new HttpRequestMessage(HttpMethod.Delete, requestUri);
+                httpRequest.Headers.Add("X-MBX-APIKEY", settings.TestApiKey);
+
+                using var client = new HttpClient();
+                var response = await client.SendAsync(httpRequest);
+
+                var content = await response.Content.ReadAsStringAsync();
+                var result = BinanceHelpers.MapToBinanceOrderResponse(content);
+                logger.Error($"Log Orders: {content}");
+
+                return result;
+            }
+            catch (System.Exception ex)
+            {
+                logger.Error(ex, "Error cancel open order");
+                return null;
+            }
+        }
+
+        public async Task<BinanceOrderResponse> GetOrder(string symbol, string clientOrderId)
+        {
+            try
+            {
+                var url = $"{settings.TestUrl}/order";
+                var timestamp = BinanceHelpers.GetUnixTimestamp();
+                var queryString = BinanceHelpers.GetCancelOrderQueryString(timestamp, symbol, clientOrderId);
+                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.TestSecretKey);
+                var requestUri = $"{url}?{queryString}&signature={hmac}";
+
+                var httpRequest = new HttpRequestMessage(HttpMethod.Get, requestUri);
+                httpRequest.Headers.Add("X-MBX-APIKEY", settings.TestApiKey);
+
+                using var client = new HttpClient();
+                var response = await client.SendAsync(httpRequest);
+
+                var content = await response.Content.ReadAsStringAsync();
+                var result = BinanceHelpers.MapToBinanceOrderResponse(content);
+                logger.Error($"Log Orders: {content}");
+
+                return result;
+            }
+            catch (System.Exception ex)
+            {
+                logger.Error(ex, "Error get order");
+                return null;
+            }
+        }
+
+        //"{\"symbol\":\"TRXBNB\",
+        //\"orderId\":5,\
+        //"orderListId\":-1,\
+        //"clientOrderId\":\"kUivlbbRlR1UeZOfnqQYy1\",
+        //\"transactTime\":1613219760762,
+        //\"price\":\"0.00100000\",
+        //\"origQty\":\"100.00000000\",
+        //\"executedQty\":\"0.00000000\",//
+        //\"cummulativeQuoteQty\":\"0.00000000\",
+        //\"status\":\"NEW\",
+        //\"timeInForce\":\"GTC\",
+        //\"type\":\"LIMIT\",
+        //\"side\":\"BUY\",
+        //\"fills\":[]}"
+
+
 
         //     [
         //   [
