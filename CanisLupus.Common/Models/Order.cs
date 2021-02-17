@@ -35,7 +35,7 @@ namespace CanisLupus.Common.Models
 
     public enum OrderStatus
     {
-        Open = 0,
+        New = 0,
         Partial,
         Filled,
         Cancelled

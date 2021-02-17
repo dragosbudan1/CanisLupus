@@ -11,6 +11,7 @@ using CanisLupus.Common.Models;
 using CanisLupus.Worker.Trader;
 using Newtonsoft.Json;
 using NLog;
+using CanisLupus.Worker.Account;
 
 namespace CanisLupus.Worker
 {
@@ -29,6 +30,7 @@ namespace CanisLupus.Worker
         private readonly ITradingClient tradingClient;
         private readonly IOrderClient orderClient;
         private readonly IWalletClient walletClient;
+        private readonly ITradingSettingsClient tradingSettingsClient;
         private const decimal IntersectionOldThreshold = 55;
         private const decimal IntersectionFinishedThreshold = 1;
         public static List<Intersection> Intersections = new List<Intersection>();
@@ -41,7 +43,8 @@ namespace CanisLupus.Worker
                                   IIntersectionClient intersectionFinder,
                                   ITradingClient tradingClient,
                                   IOrderClient orderClient,
-                                  IWalletClient walletClient)
+                                  IWalletClient walletClient,
+                                  ITradingSettingsClient tradingSettingsClient)
         {
             this.logger = LogManager.GetCurrentClassLogger();
             this.binanceClient = binanceClient;
@@ -51,6 +54,7 @@ namespace CanisLupus.Worker
             this.tradingClient = tradingClient;
             this.orderClient = orderClient;
             this.walletClient = walletClient;
+            this.tradingSettingsClient = tradingSettingsClient;
         }
 
         public async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -69,45 +73,15 @@ namespace CanisLupus.Worker
             var wmaData = await weightedMovingAverageCalculator.Calculate(allCandleData, candleData?.Count, "wmaData");
             var smmaData = await weightedMovingAverageCalculator.Calculate(allCandleData?.Skip(139).ToList(), candleData?.Count, "smmaData");
 
-            //Trading Engine (process Orders)
+            //1. Update Orders from Binance
             var openOrders = await orderClient?.FindOpenOrders();
             var activeTrades = await tradingClient?.FindActiveTrades();
-            var currentCandle = candleData?.LastOrDefault();
-            var activeIntersection = (await intersectionClient.FindIntersectionsByStatus(IntersectionStatus.Active)).FirstOrDefault();
-
-            if (candleData != null && openOrders != null && openOrders.Any())
-            {
-                // ORDER IS NOT THE LATEST
-                var openBuyOrder = openOrders.FirstOrDefault(x => x.Type == OrderType.Buy);
-                var openSellOrder = openOrders.FirstOrDefault(x => x.Type == OrderType.Sell);
-
-                if (openBuyOrder != null && openBuyOrder.Price >= currentCandle.Middle)
-                {
-                    await orderClient.UpdateOrderAsync(openBuyOrder.Id, OrderStatus.Filled);
-                    await tradingClient.CreateActiveTrade(new Trade()
-                    {
-                        OrderId = openBuyOrder.Id,
-                        TradeType = TradeType.Buy,
-                        StartSpend = openBuyOrder.Spend
-                    });
-                    activeIntersection.Status = IntersectionStatus.Finished;
-                    await intersectionClient.UpdateAsync(activeIntersection);
-                    await walletClient.UpdateWallet("fake_wallet_id", -openBuyOrder.Spend);
-                }
-
-                if (openSellOrder != null && openSellOrder.Price <= currentCandle.Middle)
-                {
-                    await orderClient.UpdateOrderAsync(openSellOrder.Id, OrderStatus.Filled);
-                    await tradingClient.CloseTrade(activeTrades?.FirstOrDefault().Id, openSellOrder);
-                    activeIntersection.Status = IntersectionStatus.Finished;
-                    await intersectionClient.UpdateAsync(activeIntersection);
-                    await walletClient.UpdateWallet("fake_wallet_id", openSellOrder.Spend);
-                }
-            }
+            // var currentCandle = candleData?.LastOrDefault();
+            // var activeIntersection = (await intersectionClient.FindIntersectionsByStatus(IntersectionStatus.Active))?.FirstOrDefault();
 
             var intersections = intersectionClient.ExtractFromChart(candleData, wmaData?.ToArray(), smmaData?.ToArray(), candleData?.Count);
 
-            // 1. Process intersections
+            // 2. Process intersections
             // - add NEW intersections
             // - update NEW -> OLD intersections
             Intersection newestIntersection = null;
@@ -140,106 +114,37 @@ namespace CanisLupus.Worker
                     }
                 }
 
-            if (openOrders != null && openOrders.Any())
+            var tradingSettings = await tradingSettingsClient.GetAsync();
+            if (tradingSettings?.TradingStatus == TradingStatus.Active)
             {
-                var openBuyOrder = openOrders.FirstOrDefault(x => x.Type == OrderType.Buy);
-                var openSellOrder = openOrders.FirstOrDefault(x => x.Type == OrderType.Sell);
-
-                if (openBuyOrder != null)
+                // 3. try to buy
+                // bug creates order each frame because it processes the interesection again
+                if ((activeTrades == null || !activeTrades.Any()) && (openOrders == null || !openOrders.Any()))
                 {
-                    if (newestIntersection?.Type == IntersectionType.Downward)
+                    // DONT REPROCESS
+                    if (newestIntersection?.Status == IntersectionStatus.New && newestIntersection?.Type == IntersectionType.Upward)
                     {
-                        var cancelledOrder = await orderClient.UpdateOrderAsync(openBuyOrder.Id, OrderStatus.Cancelled);
-                        var activeTrade = (await tradingClient.FindActiveTrades()).FirstOrDefault();
-                        if(activeTrade.OrderId == openBuyOrder.Id)
+                        var price = newestIntersection.Point.Y;
+                        var spend = tradingSettings.SpendLimit;
+                        var order = orderClient.CreateOrder(new Order()
                         {
-                            await tradingClient.CloseTrade(openBuyOrder.Id, openBuyOrder);
-                        }
-                    }
-                }
-
-                if (openSellOrder != null)
-                {
-                    if (newestIntersection?.Type == IntersectionType.Upward)
-                    {
-                        var cancelledOrder = await orderClient.UpdateOrderAsync(openSellOrder.Id, OrderStatus.Cancelled);
-                       
-                    }
-                }
-            }
-
-            // 3. Process Active trades
-            if (activeTrades != null && activeTrades.Any())
-            {
-                var currentPrice = candleData.LastOrDefault().Middle;
-
-                foreach (var trade in activeTrades)
-                {
-                    var linkedOrder = await orderClient.FindOrderById(trade.OrderId);
-
-                    if (linkedOrder != null)
-                    {
-                        // sell for profit
-                        if (linkedOrder.TargetPrice <= currentPrice && currentPrice > linkedOrder.Price)
-                        {
-                            var sellOrder = new Order()
-                            {
-                                Type = OrderType.Sell,
-                                Price = linkedOrder.TargetPrice,
-                                Amount = linkedOrder.Amount,
-                                Spend = linkedOrder.Amount * linkedOrder.TargetPrice,
-                                ProfitPercentage = linkedOrder.ProfitPercentage
-                            };
-                            await orderClient.CreateOrder(sellOrder);
-                        }
-                        else if (linkedOrder.StopLossPrice >= currentPrice && currentPrice < linkedOrder.Price)
-                        {
-                            var sellOrder = new Order()
-                            {
-                                Type = OrderType.Sell,
-                                Price = linkedOrder.StopLossPrice,
-                                Amount = linkedOrder.Amount,
-                                Spend = linkedOrder.Amount * linkedOrder.StopLossPrice,
-                                ProfitPercentage = linkedOrder.ProfitPercentage,
-                                StopLossPercentage = linkedOrder.StopLossPercentage
-                            };
-                            await orderClient.CreateOrder(sellOrder);
-                        }
+                            Spend = spend,
+                            Price = price,
+                            Amount = spend / price,
+                            ProfitPercentage = tradingSettings.ProfitPercentage,
+                            StopLossPercentage = tradingSettings.StopLossPercentage,
+                            Type = OrderType.Buy
+                        });
+                        newestIntersection.Status = IntersectionStatus.Active;
+                        await intersectionClient.UpdateAsync(newestIntersection);
                     }
                 }
             }
-
-            // 4. try to buy
-            // bug creates order each frame because it processes the interesection again
-            if ((activeTrades == null || !activeTrades.Any()) && (openOrders == null || !openOrders.Any()))
-            {
-                // DONT REPROCESS
-                if (newestIntersection?.Status == IntersectionStatus.New && newestIntersection?.Type == IntersectionType.Upward)
-                {
-                    var price = newestIntersection.Point.Y;
-                    var spend = 100;
-                    var order = orderClient.CreateOrder(new Order()
-                    {
-                        Spend = spend,
-                        Price = price,
-                        Amount = spend / price,
-                        ProfitPercentage = 2,
-                        StopLossPercentage = 5,
-                        Type = OrderType.Buy
-                    });
-                    newestIntersection.Status = IntersectionStatus.Active;
-                    await intersectionClient.UpdateAsync(newestIntersection);
-                }
-            }
-
-            var tradingInfo = new TradingInfo
-            {
-            };
 
             await eventPublisher.PublishAsync(new EventRequest
             {
                 QueueName = "tradingInfo",
-                Value = JsonConvert.SerializeObject(tradingInfo)
+                Value = JsonConvert.SerializeObject(tradingSettings)
             });
         }
 

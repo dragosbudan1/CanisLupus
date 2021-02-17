@@ -105,7 +105,7 @@ namespace CanisLupus.Tests
 
             Assert.IsNotNull(findResult);
             Assert.AreEqual(findResult.Type, OrderType.Buy);
-            Assert.AreEqual(findResult.Status, OrderStatus.Open);
+            Assert.AreEqual(findResult.Status, OrderStatus.New);
         }
 
         [Test]

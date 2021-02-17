@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using CanisLupus.Common.Database;
+using CanisLupus.Worker.Account;
 using CanisLupus.Worker.Algorithms;
 using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Exchange;
@@ -35,7 +36,7 @@ namespace CanisLupus.Worker
                             .AddTransient<ITradingClient, TradingClient>()
                             .AddTransient<IDbClient, MongoDbClient>()
                             .AddTransient<IOrderClient, OrderClient>()
-                            .AddTransient<IFakeTradingEngine, FakeTradingEngine>()
+                            .AddTransient<ITradingSettingsClient, TradingSettingsClient>()
                             .AddTransient<IWalletClient, WalletClient>();
 
                     services.Configure<DbSettings>(hostContext.Configuration.GetSection("DbSettings"))
