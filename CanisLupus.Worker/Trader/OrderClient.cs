@@ -58,9 +58,11 @@ namespace CanisLupus.Worker.Trader
         {
             try
             {
+                //create in binance
+
                 var ordersCollection = dbClient.GetCollection<Order>(OrdersCollectionName);
                 order.CreatedDate = DateTime.UtcNow;
-                order.Status = OrderStatus.Open;
+                order.Status = OrderStatus.New;
                 await ordersCollection.InsertOneAsync(order);
                 return order;
             }
@@ -74,7 +76,7 @@ namespace CanisLupus.Worker.Trader
         public async Task<List<Order>> FindOpenOrders()
         {
             var ordersCollection = dbClient.GetCollection<Order>(OrdersCollectionName);
-            Expression<Func<Order, bool>> filter = m => (m.Status == OrderStatus.Open || m.Status == OrderStatus.Partial);
+            Expression<Func<Order, bool>> filter = m => (m.Status == OrderStatus.New || m.Status == OrderStatus.Partial);
             var openOrders = (await ordersCollection.FindAsync<Order>(filter)).ToList();
 
             return openOrders;
