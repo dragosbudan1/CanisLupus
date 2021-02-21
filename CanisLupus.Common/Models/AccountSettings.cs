@@ -14,7 +14,6 @@ namespace CanisLupus.Common.Models
         public TradingSettings()
         {
             Id = Guid.NewGuid().ToString();
-            UserId = "dragos";
         }
 
         public string Id { get; private set; }
@@ -23,7 +22,6 @@ namespace CanisLupus.Common.Models
         public decimal TotalSpendLimit { get; set; }
         public decimal ProfitPercentage { get; set; }
         public decimal StopLossPercentage { get; set; }
-        public string UserId { get; private set;}     
         public DateTime CreatedDate { get; set; }
         public DateTime UpdatedDate { get; set; }
     }

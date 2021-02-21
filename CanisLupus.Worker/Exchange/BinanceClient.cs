@@ -4,10 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using CanisLupus.Worker.Extensions;
 using CanisLupus.Common.Models;
-using Newtonsoft.Json.Linq;
 using NLog;
-using System.Text;
-using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
 
 namespace CanisLupus.Worker.Exchange
@@ -42,7 +39,7 @@ namespace CanisLupus.Worker.Exchange
                     throw new ArgumentNullException(nameof(pairName));
 
                 var client = new HttpClient();
-                var response = await client.GetAsync($"{settings.TestUrl}/klines?symbol={pairName}&interval={interval}&limit={count}");
+                var response = await client.GetAsync($"{settings.Url}/klines?symbol={pairName}&interval={interval}&limit={count}");
                 response.EnsureSuccessStatusCode();
 
                 var content = await response.Content.ReadAsStringAsync();
@@ -88,14 +85,14 @@ namespace CanisLupus.Worker.Exchange
         {
             try
             {
-                var url = $"{settings.TestUrl}/openOrders";
+                var url = $"{settings.Url}/openOrders";
                 var timestamp = BinanceHelpers.GetUnixTimestamp();
                 var queryString = BinanceHelpers.GetOpenOrderQueryString(timestamp, symbol);
-                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.TestSecretKey);
+                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.SecretKey);
                 var requestUri = $"{url}?{queryString}&signature={hmac}";
 
                 var httpRequest = new HttpRequestMessage(HttpMethod.Get, requestUri);
-                httpRequest.Headers.Add("X-MBX-APIKEY", settings.TestApiKey);
+                httpRequest.Headers.Add("X-MBX-APIKEY", settings.ApiKey);
 
                 using var client = new HttpClient();
                 var response = await client.SendAsync(httpRequest);
@@ -118,14 +115,14 @@ namespace CanisLupus.Worker.Exchange
         {
             try
             {
-                var url = $"{settings.TestUrl}/order";
+                var url = $"{settings.Url}/order";
                 var timestamp = BinanceHelpers.GetUnixTimestamp();
                 var queryString = BinanceHelpers.GetTradeQueryString(timestamp, request);
-                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.TestSecretKey);
+                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.SecretKey);
                 var requestUri = $"{url}?{queryString}&signature={hmac}";
 
                 HttpRequestMessage httpRequest = new HttpRequestMessage(HttpMethod.Post, requestUri);
-                httpRequest.Headers.Add("X-MBX-APIKEY", settings.TestApiKey);
+                httpRequest.Headers.Add("X-MBX-APIKEY", settings.ApiKey);
 
                 using var client = new HttpClient();
                 var response = await client.SendAsync(httpRequest);
@@ -152,14 +149,14 @@ namespace CanisLupus.Worker.Exchange
         {
             try
             {
-                var url = $"{settings.TestUrl}/openOrders";
+                var url = $"{settings.Url}/openOrders";
                 var timestamp = BinanceHelpers.GetUnixTimestamp();
                 var queryString = BinanceHelpers.GetOpenOrderQueryString(timestamp, symbol);
-                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.TestSecretKey);
+                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.SecretKey);
                 var requestUri = $"{url}?{queryString}&signature={hmac}";
 
                 var httpRequest = new HttpRequestMessage(HttpMethod.Delete, requestUri);
-                httpRequest.Headers.Add("X-MBX-APIKEY", settings.TestApiKey);
+                httpRequest.Headers.Add("X-MBX-APIKEY", settings.ApiKey);
 
                 using var client = new HttpClient();
                 var response = await client.SendAsync(httpRequest);
@@ -181,14 +178,14 @@ namespace CanisLupus.Worker.Exchange
         {
             try
             {
-                var url = $"{settings.TestUrl}/order";
+                var url = $"{settings.Url}/order";
                 var timestamp = BinanceHelpers.GetUnixTimestamp();
                 var queryString = BinanceHelpers.GetCancelOrderQueryString(timestamp, symbol, orderId);
-                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.TestSecretKey);
+                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.SecretKey);
                 var requestUri = $"{url}?{queryString}&signature={hmac}";
 
                 var httpRequest = new HttpRequestMessage(HttpMethod.Delete, requestUri);
-                httpRequest.Headers.Add("X-MBX-APIKEY", settings.TestApiKey);
+                httpRequest.Headers.Add("X-MBX-APIKEY", settings.ApiKey);
 
                 using var client = new HttpClient();
                 var response = await client.SendAsync(httpRequest);
@@ -210,14 +207,14 @@ namespace CanisLupus.Worker.Exchange
         {
             try
             {
-                var url = $"{settings.TestUrl}/order";
+                var url = $"{settings.Url}/order";
                 var timestamp = BinanceHelpers.GetUnixTimestamp();
                 var queryString = BinanceHelpers.GetCancelOrderQueryString(timestamp, symbol, clientOrderId);
-                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.TestSecretKey);
+                var hmac = BinanceHelpers.GenerateHMAC256(queryString, settings.SecretKey);
                 var requestUri = $"{url}?{queryString}&signature={hmac}";
 
                 var httpRequest = new HttpRequestMessage(HttpMethod.Get, requestUri);
-                httpRequest.Headers.Add("X-MBX-APIKEY", settings.TestApiKey);
+                httpRequest.Headers.Add("X-MBX-APIKEY", settings.ApiKey);
 
                 using var client = new HttpClient();
                 var response = await client.SendAsync(httpRequest);

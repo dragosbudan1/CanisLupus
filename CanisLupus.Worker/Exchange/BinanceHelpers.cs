@@ -36,6 +36,48 @@ namespace CanisLupus.Worker.Exchange
             return response;
         }
 
+        public static Order MapToOrder(this BinanceOrderResponse response, Order origOrder)
+        {
+            return new Order
+            {
+                Id = response.ClientOrderId,
+                Price = response.Price,
+                Quantity = response.OrigQty,
+                ProfitPercentage = origOrder.ProfitPercentage,
+                StopLossPercentage = origOrder.StopLossPercentage,
+                Symbol = response.Symbol,
+                SpendAmount = origOrder.SpendAmount,
+                Status = MapToOrderStatus(response.Status),
+                Side = MapToOrderType(response.Side),
+                CreatedDate = UnixTimeStampToDateTime((double)response.TransactTime),
+                UpdatedDate = UnixTimeStampToDateTime((double)response.TransactTime)
+            };
+        }
+
+        public static OrderStatus MapToOrderStatus(string respStauts)
+        {
+            switch(respStauts)
+            {
+                case "CANCELED":
+                    return OrderStatus.Cancelled;
+                case "NEW":
+                default:
+                    return OrderStatus.New;
+            }
+        }
+
+        public static OrderSide MapToOrderType(string respType)
+        {
+            switch(respType)
+            {
+                case "SELL":
+                    return OrderSide.Sell;
+                case "BUY":
+                default:
+                    return OrderSide.Buy;
+            }
+        }
+
         public static List<BinanceOrderResponse> MapToListBinanceOrderResponse(string content)
         {
             var jarray = JArray.Parse(content);
@@ -75,7 +117,7 @@ namespace CanisLupus.Worker.Exchange
             return list;
         }
 
-        public static string GetTradeQueryString(string timestamp, string symbol = "BTCUSDT", OrderType side = OrderType.Sell, decimal? quantity = 0.01m, decimal? price = 46000m)
+        public static string GetTradeQueryString(string timestamp, string symbol = "BTCUSDT", OrderSide side = OrderSide.Sell, decimal? quantity = 0.01m, decimal? price = 46000m)
         {
             return new StringBuilder()
                 .Append($"symbol={symbol}&")

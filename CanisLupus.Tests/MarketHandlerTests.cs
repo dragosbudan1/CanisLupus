@@ -229,13 +229,13 @@ namespace CanisLupus.Tests
                 It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
                 .Returns(intersections);
 
-            mockOrderClient.Verify(x => x.CreateOrder(It.Is<Order>(s =>
+            mockOrderClient.Verify(x => x.CreateAsync(It.Is<Order>(s =>
                 s.Price == newIntersection.Point.Y &&
-                s.Spend == tradingsSettings.SpendLimit &&
+                s.SpendAmount == tradingsSettings.SpendLimit &&
                 s.ProfitPercentage == tradingsSettings.ProfitPercentage &&
                 s.StopLossPercentage == tradingsSettings.StopLossPercentage &&
-                s.Amount == tradingsSettings.SpendLimit / newIntersection.Point.Y &&
-                s.Type == OrderType.Buy)), Times.Once);
+                s.Quantity == tradingsSettings.SpendLimit / newIntersection.Point.Y &&
+                s.Side == OrderSide.Buy)), Times.Once);
         }
     }
 }

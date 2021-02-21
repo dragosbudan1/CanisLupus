@@ -33,9 +33,6 @@ namespace CanisLupus.Worker
         private readonly ITradingSettingsClient tradingSettingsClient;
         private const decimal IntersectionOldThreshold = 55;
         private const decimal IntersectionFinishedThreshold = 1;
-        public static List<Intersection> Intersections = new List<Intersection>();
-
-        public static Wallet Wallet;
 
         public MarketMakerHandler(IBinanceClient binanceClient,
                                   IEventPublisher candleDataPublisher,
@@ -60,18 +57,12 @@ namespace CanisLupus.Worker
         public async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             //var latestSymbolCandle = await binanceClient.GetLatestCandleAsync("DOGEUSDT");
-            var allCandleData = await binanceClient.GetCandlesAsync("BNBBUSD", 144 + 60, "1m");
+            var allCandleData = await binanceClient.GetCandlesAsync("DOGEUSDT", 144 + 60, "1m");
             var candleData = allCandleData?.TakeLast(60).ToList();
             logger.Info("Candle {0}", candleData?.FirstOrDefault().ToLoggableMin());
 
-            var result = await eventPublisher.PublishAsync(new EventRequest()
-            {
-                QueueName = "candleData",
-                Value = JsonConvert.SerializeObject(candleData)
-            });
-
-            var wmaData = await weightedMovingAverageCalculator.Calculate(allCandleData, candleData?.Count, "wmaData");
-            var smmaData = await weightedMovingAverageCalculator.Calculate(allCandleData?.Skip(139).ToList(), candleData?.Count, "smmaData");
+            var wmaData = await weightedMovingAverageCalculator.Calculate(allCandleData, candleData?.Count);
+            var smmaData = await weightedMovingAverageCalculator.Calculate(allCandleData?.Skip(139).ToList(), candleData?.Count);
 
             //1. Update Orders from Binance
             var openOrders = await orderClient?.FindOpenOrders();
@@ -80,6 +71,8 @@ namespace CanisLupus.Worker
             // var activeIntersection = (await intersectionClient.FindIntersectionsByStatus(IntersectionStatus.Active))?.FirstOrDefault();
 
             var intersections = intersectionClient.ExtractFromChart(candleData, wmaData?.ToArray(), smmaData?.ToArray(), candleData?.Count);
+
+            await PublishData(candleData, smmaData, wmaData, intersections);
 
             // 2. Process intersections
             // - add NEW intersections
@@ -115,8 +108,10 @@ namespace CanisLupus.Worker
                 }
 
             var tradingSettings = await tradingSettingsClient.GetAsync();
+            logger.Info($"MarketHandler: {tradingSettings?.TradingStatus}");
             if (tradingSettings?.TradingStatus == TradingStatus.Active)
             {
+                logger.Info($"Running trading algo");
                 // 3. try to buy
                 // bug creates order each frame because it processes the interesection again
                 if ((activeTrades == null || !activeTrades.Any()) && (openOrders == null || !openOrders.Any()))
@@ -126,26 +121,20 @@ namespace CanisLupus.Worker
                     {
                         var price = newestIntersection.Point.Y;
                         var spend = tradingSettings.SpendLimit;
-                        var order = orderClient.CreateOrder(new Order()
+                        var order = orderClient.CreateAsync(new Order()
                         {
-                            Spend = spend,
+                            SpendAmount = spend,
                             Price = price,
-                            Amount = spend / price,
+                            Quantity = spend / price,
                             ProfitPercentage = tradingSettings.ProfitPercentage,
                             StopLossPercentage = tradingSettings.StopLossPercentage,
-                            Type = OrderType.Buy
+                            Side = OrderSide.Buy
                         });
                         newestIntersection.Status = IntersectionStatus.Active;
                         await intersectionClient.UpdateAsync(newestIntersection);
                     }
                 }
             }
-
-            await eventPublisher.PublishAsync(new EventRequest
-            {
-                QueueName = "tradingInfo",
-                Value = JsonConvert.SerializeObject(tradingSettings)
-            });
         }
 
         private void ProcessIntersection(Intersection intersection, decimal currentX)
@@ -160,6 +149,41 @@ namespace CanisLupus.Worker
             {
                 intersection.Status = IntersectionStatus.Finished;
             }
+        }
+
+        private async Task PublishData(List<CandleRawData> candleRawData, List<Vector2> smaData, List<Vector2> wmaData, List<Intersection> intersectionList)
+        {
+            List<string> messages = new List<string>();
+            if (!intersectionList.Any())
+            {
+                // log no interesections found
+                var message = $"{DateTime.UtcNow} No intersections found between {candleRawData?.FirstOrDefault().OpenTime} - {candleRawData?.LastOrDefault().CloseTime}";
+                logger.Info(message);
+                messages.Add(message);
+            }
+            else
+            {
+                foreach (var item in intersectionList)
+                {
+                    var message = $"{DateTime.UtcNow} Intersection found: {candleRawData?.ElementAt((int)item.Point.X)?.ToLoggableMin()}, sma: {item.Point.Y}, trend: {item.Type.ToString()}";
+                    logger.Info(message);
+                    messages.Add(message);
+                }
+            }
+
+            var viewData = new ViewData
+            {
+                CandleData = candleRawData,
+                SmaData = smaData,
+                WmaData = wmaData,
+                TradingLogs = messages               
+            };
+
+            await eventPublisher.PublishAsync(new EventRequest()
+            {
+                QueueName = "viewData",
+                Value = JsonConvert.SerializeObject(viewData)
+            });
         }
     }
 }

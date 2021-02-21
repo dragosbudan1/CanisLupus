@@ -8,19 +8,16 @@ namespace CanisLupus.Worker.Algorithms
 {
     public interface IWeightedMovingAverageCalculator
     {
-        Task<List<Vector2>> Calculate(List<CandleRawData> data, int? dataSetCount, string eventName);
+        Task<List<Vector2>> Calculate(List<CandleRawData> data, int? dataSetCount);
     }
 
     public class WeightedMovingAverageCalculator : IWeightedMovingAverageCalculator
     {
-        private readonly IEventPublisher eventPublisher;
-
-        public WeightedMovingAverageCalculator(IEventPublisher eventPublisher)
+        public WeightedMovingAverageCalculator()
         {
-            this.eventPublisher = eventPublisher;
         }
 
-        public async Task<List<Vector2>> Calculate(List<CandleRawData> data, int? dataSetCount = 0, string eventName = "wmaData")
+        public async Task<List<Vector2>> Calculate(List<CandleRawData> data, int? dataSetCount = 0)
         {
             var weightsCount = data.Count - dataSetCount;
             var weights = new List<decimal>();
@@ -42,12 +39,6 @@ namespace CanisLupus.Worker.Algorithms
                 var wma = top / bottom;
                 wmaResults.Add(new Vector2(x: i, y: wma));
             }
-
-            await eventPublisher.PublishAsync(new EventRequest
-            {
-                QueueName = eventName,
-                Value = JsonConvert.SerializeObject(wmaResults)
-            });
 
             return wmaResults;
         }

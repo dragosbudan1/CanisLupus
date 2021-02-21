@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using System.Threading.Tasks;
 using CanisLupus.Common.Database;
 using CanisLupus.Common.Models;
+using CanisLupus.Worker.Exchange;
 using MongoDB.Driver;
 using NLog;
 
@@ -12,59 +13,82 @@ namespace CanisLupus.Worker.Trader
     public interface IOrderClient
     {
         Task<List<Order>> FindOpenOrders();
-        Task<string> UpdateOrderAsync(string orderId, OrderStatus newStatus);
-        Task<Order> CreateOrder(Order order);
-        Task<Order> FindOrderById(string orderId);
+        Task<Order> CreateAsync(Order order);
+        Task<bool> CancelAsync(string orderId);
+        Task<Order> FindByIdAsync(string orderId);
     }
     public class OrderClient : IOrderClient
     {
         private readonly IDbClient dbClient;
         private readonly ILogger logger;
         public const string OrdersCollectionName = "Orders";
+        private readonly IBinanceClient binanceClient;
 
-        public OrderClient(IDbClient dbClient)
+        public OrderClient(IDbClient dbClient, IBinanceClient binanceClient)
         {
+            this.binanceClient = binanceClient;
             this.dbClient = dbClient;
             this.logger = LogManager.GetCurrentClassLogger();
         }
 
-        public async Task<string> UpdateOrderAsync(string orderId, OrderStatus newStatus)
+        public async Task<bool> CancelAsync(string orderId)
         {
             try
             {
-                var collection = dbClient.GetCollection<Order>(OrdersCollectionName);
+                var ordersCollection = dbClient.GetCollection<Order>(OrdersCollectionName);
                 Expression<Func<Order, bool>> filter = m => (m.Id == orderId);
+                var existingOrder = (await ordersCollection.FindAsync<Order>(filter)).FirstOrDefault();
+
+                if(existingOrder == null)
+                {
+                    logger.Warn($"Cannot cancel order id {orderId}: Order not found");
+                }
+
+                var binanceResponse = await binanceClient.CancelOrder(existingOrder.Symbol, existingOrder.Id);
+
+                if(binanceResponse == null)
+                {
+                    logger.Warn($"Cannot cancel order id {orderId}: Binance failed. Order details {existingOrder}");
+                }
 
                 var update = Builders<Order>.Update
                     .Set(m => m.UpdatedDate, DateTime.Now)
-                    .Set(m => m.Status, newStatus);
+                    .Set(m => m.Status, BinanceHelpers.MapToOrderStatus(binanceResponse?.Status));
 
-                var updateResult = await collection.UpdateOneAsync<Order>(filter, update);
+                var updateResult = await ordersCollection.UpdateOneAsync<Order>(filter, update);
 
-                if(updateResult?.ModifiedCount > 0)
-                {
-                    return orderId;
-                }
-                return null;
+                return updateResult?.ModifiedCount > 0;
             }
             catch (System.Exception ex)
             {
                 logger.Error(ex, $"Error cancelling order {orderId}: {ex.Message}");
-                return null;
+                return false;
             }
         }
 
-        public async Task<Order> CreateOrder(Order order)
+        public async Task<Order> CreateAsync(Order order)
         {
             try
             {
-                //create in binance
+                var binanceOrder = await binanceClient.CreateOrder(new BinanceOrderRequest
+                {
+                    ClientOrderId = order.Id,
+                    Price = order.Price,
+                    Quantity = order.Quantity,
+                    Side = order.Side,
+                    Symbol = order.Symbol
+                });
+
+                if (binanceOrder == null)
+                {
+                    logger.Error($"Error creating binance order for details {order}");
+                }
+
+                var confirmedOrder = binanceOrder.MapToOrder(order);
 
                 var ordersCollection = dbClient.GetCollection<Order>(OrdersCollectionName);
-                order.CreatedDate = DateTime.UtcNow;
-                order.Status = OrderStatus.New;
-                await ordersCollection.InsertOneAsync(order);
-                return order;
+                await ordersCollection.InsertOneAsync(confirmedOrder);
+                return confirmedOrder;
             }
             catch (SystemException ex)
             {
@@ -82,7 +106,7 @@ namespace CanisLupus.Worker.Trader
             return openOrders;
         }
 
-        public async Task<Order> FindOrderById(string orderId)
+        public async Task<Order> FindByIdAsync(string orderId)
         {
             var ordersCollection = dbClient.GetCollection<Order>(OrdersCollectionName);
             Expression<Func<Order, bool>> filter = m => (m.Id == orderId);

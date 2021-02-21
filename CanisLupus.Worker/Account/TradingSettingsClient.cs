@@ -16,9 +16,9 @@ namespace CanisLupus.Worker.Account
     public class TradingSettingsClient : ITradingSettingsClient
     {
         public const string TradingSettingsCollectionName = "TradingSettings";
-        private MongoDbClient dbClient;
+        private IDbClient dbClient;
 
-        public TradingSettingsClient(MongoDbClient dbClient)
+        public TradingSettingsClient(IDbClient dbClient)
         {
             this.dbClient = dbClient;
         }
@@ -26,7 +26,7 @@ namespace CanisLupus.Worker.Account
         public async Task<TradingSettings> InsertOrUpdateAsync(TradingSettings settings)
         {
             var collection = dbClient.GetCollection<TradingSettings>(TradingSettingsCollectionName);
-            Expression<Func<TradingSettings, bool>> filter = m => (m.UserId == "dragos");
+            Expression<Func<TradingSettings, bool>> filter = m => (m.Id != null);
 
             var tradingSettings = (await collection.FindAsync(filter)).FirstOrDefault();
 
@@ -45,23 +45,16 @@ namespace CanisLupus.Worker.Account
                 return settings;
             }
 
-            var newSettings = new TradingSettings()
-            {
-                CreatedDate = DateTime.UtcNow,
-                ProfitPercentage = settings.ProfitPercentage,
-                SpendLimit = settings.SpendLimit,
-                StopLossPercentage = settings.StopLossPercentage,
-                TotalSpendLimit = settings.TotalSpendLimit,
-            };
+            settings.CreatedDate = DateTime.UtcNow;
 
-            await collection.InsertOneAsync(newSettings);
-            return newSettings;
+            await collection.InsertOneAsync(settings);
+            return settings;
         }
 
         public async Task<TradingSettings> GetAsync()
         {
             var collection = dbClient.GetCollection<TradingSettings>(TradingSettingsCollectionName);
-            Expression<Func<TradingSettings, bool>> filter = m => (m.UserId == "dragos");
+            Expression<Func<TradingSettings, bool>> filter = m => (m .Id != null);
             var tradingSettings = (await collection.FindAsync(filter)).FirstOrDefault();
 
             return tradingSettings;

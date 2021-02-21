@@ -1,17 +1,11 @@
 using System;
-using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using CanisLupus.Common.Database;
 using CanisLupus.Common.Models;
 using CanisLupus.Worker.Account;
-using CanisLupus.Worker.Algorithms;
-using CanisLupus.Worker.Events;
-using CanisLupus.Worker.Trader;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Moq;
 using NUnit.Framework;
 
 namespace CanisLupus.Tests
@@ -61,12 +55,16 @@ namespace CanisLupus.Tests
         {
             var tradingSettings = new TradingSettings();
             await SUT.InsertOrUpdateAsync(tradingSettings);
+
+            var updatedSettings = tradingSettings;
+            updatedSettings.ProfitPercentage = 10;
+            await SUT.InsertOrUpdateAsync(updatedSettings);
             var result = await SUT.GetAsync();
 
             Assert.IsNotNull(result);
             Assert.AreEqual(result.TradingStatus, TradingStatus.Stopped);
-            Assert.AreEqual(result.UserId, "dragos");
-
+            Assert.AreEqual(result.Id, tradingSettings.Id);
+            Assert.AreEqual(result.ProfitPercentage, updatedSettings.ProfitPercentage);
         }
     }
 }

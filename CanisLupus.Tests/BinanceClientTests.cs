@@ -43,7 +43,7 @@ namespace CanisLupus.Tests
                 Symbol = "TRXBNB",
                 Price = 0.001m,
                 Quantity = 100m,
-                Side = OrderType.Buy
+                Side = OrderSide.Buy
             };
 
             var result = await SUT.CreateOrder(req);
@@ -64,7 +64,7 @@ namespace CanisLupus.Tests
                 Symbol = "TRXBNB",
                 Price = 0.001m,
                 Quantity = 100m,
-                Side = OrderType.Buy
+                Side = OrderSide.Buy
             };
 
             var buyOrder = await SUT.CreateOrder(req);
@@ -84,7 +84,7 @@ namespace CanisLupus.Tests
                 Symbol = "TRXBNB",
                 Price = 0.001m,
                 Quantity = 100m,
-                Side = OrderType.Buy
+                Side = OrderSide.Buy
             };
 
             var req2 = new BinanceOrderRequest()
@@ -92,7 +92,7 @@ namespace CanisLupus.Tests
                 Symbol = "TRXBNB",
                 Price = 0.001m,
                 Quantity = 100m,
-                Side = OrderType.Buy
+                Side = OrderSide.Buy
             };
 
             var buyOrder = await SUT.CreateOrder(req);
@@ -119,7 +119,7 @@ namespace CanisLupus.Tests
                 Symbol = "TRXBNB",
                 Price = 0.001m,
                 Quantity = 100m,
-                Side = OrderType.Buy
+                Side = OrderSide.Buy
             };
 
             var buyOrder = await SUT.CreateOrder(req);
@@ -138,7 +138,7 @@ namespace CanisLupus.Tests
                 Symbol = "TRXBNB",
                 Price = 0.001m,
                 Quantity = 100m,
-                Side = OrderType.Buy
+                Side = OrderSide.Buy
             };
 
             var buyOrder = await SUT.CreateOrder(req);

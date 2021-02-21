@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using CanisLupus.Common.Models;
 using CanisLupus.Web.Events;
@@ -38,28 +39,30 @@ namespace CanisLupus.Web.Controllers
         [HttpGet]
         public async Task<object> Get()
         {
-            var task1 = eventReceiver.ReceiveAsync<List<WorkerData>>("candleData");
-            var task4 = eventReceiver.ReceiveAsync<List<Common.Models.Vector2>>("wmaData");
-            var task5 = eventReceiver.ReceiveAsync<List<Common.Models.Vector2>>("smmaData");
-            var task6 = eventReceiver.ReceiveAsync<List<string>>("tradingLogs");
-            var task7 = eventReceiver.ReceiveAsync<TradingInfo>("tradingInfo");
+            var viewData = await eventReceiver.ReceiveAsync<ViewData>("viewData");
 
-            Task.WaitAll(task1, task4, task5, task6);
-
-            var candleData = await Task.FromResult(task1.Result);
-            var wmaData = await Task.FromResult(task4.Result);
-            var smmaData = await Task.FromResult(task5.Result);
-            var tradingLogsData = await Task.FromResult(task6.Result);
-            var tradingInfoData = await Task.FromResult(task7.Result);
-
-            TryMergeMovingAverageData(candleData, wmaData, smmaData);
             logger.Info("returning data");
+            var workerData = MapToWorkerData(viewData);
+
             return new
             {
-                candleData = candleData,
-                tradingLogsData = tradingLogsData,
-                tradingInfoData = tradingInfoData
+                candleData = workerData,
+                tradingLogsData = viewData.TradingLogs
             };
+        }
+
+        private List<WorkerData> MapToWorkerData(ViewData data)
+        {
+            var workerData = data.CandleData.Select(x => new WorkerData()
+            {   
+                Orientation = x.Orientation,
+                Bottom = x.Bottom,
+                Top = x.Top
+            }).ToList();
+
+            TryMergeMovingAverageData(workerData, data.WmaData, data.SmaData);
+
+            return workerData;
         }
 
         private void TryMergeMovingAverageData(List<WorkerData> candleData, List<Vector2> wmaData, List<Vector2> smmaData)

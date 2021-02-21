@@ -81,11 +81,14 @@ export class Home extends Component {
       chartViewSwitch: false,
       tradingLogs: ['Waiting for logs'],
       lastUpdated: null,
+      currentSymbol: "hello"
       //tradingInfo: 'Waiting for trading info'
     };
 
     this.getWorkerData = this.getWorkerData.bind(this)
     this.onChangeChartView = this.onChangeChartView.bind(this)
+    this.onChangeSymbol = this.onChangeSymbol.bind(this)
+    this.onUpdateSymbol = this.onUpdateSymbol.bind(this)
   }
   static displayName = Home.name;
 
@@ -147,10 +150,20 @@ export class Home extends Component {
       }).catch(err => console.log(err))
   }
 
-  onChangeChartView(enabled) {
+  onChangeChartView(enabled) { 
     this.setState({
       chartViewSwitch: enabled
-    });
+    })
+  }
+
+  onChangeSymbol(e) {
+    this.setState({
+      currentSymbol: e.target.value
+    })
+  }
+
+  onUpdateSymbol() {
+    console.log(this.state.currentSymbol)
   }
 
   renderViewControls() {
@@ -159,7 +172,7 @@ export class Home extends Component {
         <ViewControls viewSwitch={this.state.chartViewSwitch}
           onChangeChartView={this.onChangeChartView} />
       </div>
-    );
+    )
   }
   renderCandlesChart() {
     return (
@@ -216,31 +229,24 @@ export class Home extends Component {
         <div>
           {this.state.tradingInfo}
         </div>
-        <div>
+        <div className="row">
           {this.renderViewControls()}
         </div>
-        <div>
+        <div className="row">
           {this.state.chartViewSwitch && this.renderLineChart()}
           {!this.state.chartViewSwitch && this.renderCandlesChart()}
-          <LogsDisplay logs={this.state.tradingLogs} />
         </div>
+        <div className="row">
+            <label>
+              Symbol:
+          <input type="text" value={this.state.currentSymbol} onChange={this.onChangeSymbol} />
+            </label>
+            <button onClick={this.onUpdateSymbol}>
+              Update
+            </button>
+          </div>
         <div>
-          <ScatterChart
-            width={780}
-            height={400}
-            margin={{
-              top: 20, right: 40, bottom: 20, left: 40,
-            }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" dataKey="x" name="time" unit="min" />
-            <YAxis type="number" dataKey="y" name="value" domain={[this.state.minChart, this.state.maxChart]} />
-            <ZAxis type="number" range={[100]} />
-            <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-            <Legend />
-            <Scatter name="High" data={this.state.highClusterData} fill="#8884d8" line shape="cross" />
-            <Scatter name="Low" data={this.state.lowClusterData} fill="#82ca9d" line shape="diamond" />
-          </ScatterChart>
+          <LogsDisplay logs={this.state.tradingLogs} />
         </div>
       </div>
 

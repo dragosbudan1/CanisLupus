@@ -16,8 +16,8 @@ namespace CanisLupus.Common.Models
         public string Id { get; set; }
         public DateTime? CreatedDate { get; set; }
         public DateTime? UpdatedDate { get; set; }
-        public decimal Amount { get; set; }
-        public decimal Spend { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal SpendAmount { get; set; }
         public decimal Price { get; set; }
         public decimal TargetPrice => Price + (Price * (ProfitPercentage / 100));
         public decimal StopLossPrice => Price - (Price * (StopLossPercentage / 100));
@@ -30,7 +30,8 @@ namespace CanisLupus.Common.Models
 
         [JsonConverter(typeof(StringEnumConverter))]
         [BsonRepresentation(BsonType.String)]
-        public OrderType Type { get; set; }
+        public OrderSide Side { get; set; }
+        public string Symbol { get; set; }
     }
 
     public enum OrderStatus

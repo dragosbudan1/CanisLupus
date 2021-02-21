@@ -38,9 +38,9 @@ namespace CanisLupus.Worker.Extensions
         public static object ToLoggable(this Order order)
         {
             return new {
-                order.Type,
-                order.Spend,
-                order.Amount
+                order.Side,
+                order.SpendAmount,
+                order.Quantity
             };
         }
     }

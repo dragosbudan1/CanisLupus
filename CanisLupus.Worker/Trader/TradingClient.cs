@@ -36,7 +36,7 @@ namespace CanisLupus.Worker.Trader
             var update = Builders<Trade>.Update
                 .Set(m => m.UpdatedDate, DateTime.Now)
                 .Set(m => m.TradeStatus, TradeStatus.Finished)
-                .Set(m => m.CloseSpend, order.Spend)
+                .Set(m => m.CloseSpend, order.SpendAmount)
                 .Set(m => m.CloseOrderId, order.Id);
 
             var cancelledOrder = await collection.FindOneAndUpdateAsync<Trade>(filter, update);
@@ -69,7 +69,7 @@ namespace CanisLupus.Worker.Trader
             var update = Builders<Trade>.Update
                 .Set(m => m.UpdatedDate, DateTime.Now)
                 .Set(m => m.TradeStatus, TradeStatus.Finished)
-                .Set(m => m.CloseSpend, order.Spend)
+                .Set(m => m.CloseSpend, order.SpendAmount)
                 .Set(m => m.CloseOrderId, order.Id);
 
             var cancelledOrder = await collection.FindOneAndUpdateAsync<Trade>(filter, update);

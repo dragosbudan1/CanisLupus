@@ -1,6 +1,6 @@
 namespace CanisLupus.Common.Models
 {
-    public enum OrderType
+    public enum OrderSide
     {
         Buy = 0,
         Sell

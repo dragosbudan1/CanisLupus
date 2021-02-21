@@ -82,27 +82,7 @@ namespace CanisLupus.Worker.Algorithms
                     }
                 }
             }
-
-            List<string> messages = new List<string>();
-            if (!intersectionList.Any())
-            {
-                // log no interesections found
-                var message = $"{DateTime.UtcNow} No intersections found between {candleData?.FirstOrDefault().OpenTime} - {candleData?.LastOrDefault().CloseTime}";
-                logger.Info(message);
-                messages.Add(message);
-            }
-            else
-            {
-                foreach (var item in intersectionList)
-                {
-                    var message = $"{DateTime.UtcNow} Intersection found: {candleData?.ElementAt((int)item.Point.X)?.ToLoggableMin()}, sma: {item.Point.Y}, trend: {item.Type.ToString()}";
-                    logger.Info(message);
-                    messages.Add(message);
-                }
-            }
-
-            eventPublisher.PublishAsync(new EventRequest { QueueName = "tradingLogs", Value = JsonConvert.SerializeObject(messages) });
-
+            
             return intersectionList;
         }
 

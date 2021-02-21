@@ -95,8 +95,8 @@ namespace CanisLupus.Tests
             var order = new Order()
             {
                 Id = "orderId",
-                Spend = 200,
-                Type = OrderType.Sell,
+                SpendAmount = 200,
+                Side = OrderSide.Sell,
             };
 
             var result = await SUT.CloseTrade(trade.Id, order);
