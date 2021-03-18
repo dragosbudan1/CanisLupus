@@ -15,7 +15,7 @@ namespace CanisLupus.Worker.Algorithms
 {
     public interface IIntersectionClient
     {
-        List<Intersection> ExtractFromChart(List<CandleRawData> candleData, Vector2[] allWmaData, Vector2[] allSmmaData, int? dataSetCount = null);
+        List<Intersection> ExtractFromChart(Vector2[] allWmaData, Vector2[] allSmmaData, string symbol, int? dataSetCount = null);
         Task<bool> InsertAsync(Intersection intersection);
         Task<Intersection> FindByIntersectionDetails(Intersection intersection);
         Task<Intersection> UpdateAsync(Intersection intersection);
@@ -36,7 +36,7 @@ namespace CanisLupus.Worker.Algorithms
             this.dbClient = dbClient;
         }
 
-        public List<Intersection> ExtractFromChart(List<CandleRawData> candleData, Vector2[] wmaData, Vector2[] smmaData, int? dataSetCount = null)
+        public List<Intersection> ExtractFromChart(Vector2[] wmaData, Vector2[] smmaData, string symbol, int? dataSetCount = null)
         {
 
             if (dataSetCount.HasValue)
@@ -71,7 +71,8 @@ namespace CanisLupus.Worker.Algorithms
                     var intersection = new Intersection
                     {
                         Type = GetIntersectionType(smaNext, smaCurrent),
-                        Point = new Vector2(i, diffList.Min(x => x.Y))
+                        Point = new Vector2(i, diffList.Min(x => x.Y)),
+                        Symbol = symbol
                     };
 
                     var closePreviousIntersection = intersectionList.FirstOrDefault(x => x.Point.X == i - 1);
@@ -96,10 +97,10 @@ namespace CanisLupus.Worker.Algorithms
         public async Task<Intersection> FindByIntersectionDetails(Intersection intersection)
         {
             var intersectionCollection = dbClient.GetCollection<Intersection>(IntersectionsCollectionName);
-            Expression<Func<Intersection, bool>> filter = m => (m.Point.Y == intersection.Point.Y && m.Type == intersection.Type);
-            var existingIntersection = (await intersectionCollection.FindAsync<Intersection>(filter)).FirstOrDefault();
+            Expression<Func<Intersection, bool>> filter = m => (m.Point.Y == intersection.Point.Y && m.Type == intersection.Type && m.Symbol == intersection.Symbol);
+            var existingIntersections = (await intersectionCollection.FindAsync<Intersection>(filter));
 
-            return existingIntersection;
+            return existingIntersections?.FirstOrDefault();
         }
 
 

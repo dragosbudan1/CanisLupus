@@ -24,5 +24,6 @@ namespace CanisLupus.Common.Models
         public decimal StopLossPercentage { get; set; }
         public DateTime CreatedDate { get; set; }
         public DateTime UpdatedDate { get; set; }
+        public string Symbol { get; set; }
     }
 }

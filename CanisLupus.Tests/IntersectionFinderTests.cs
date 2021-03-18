@@ -12,6 +12,7 @@ namespace CanisLupus.Tests
     public class IntersectionFinderTests
     {
         IIntersectionClient finder;
+        string Symbol = "BTCUSDT";
 
         [SetUp]
         public void Setup()
@@ -22,38 +23,37 @@ namespace CanisLupus.Tests
         [Test]
         public void TestCrossIntersection()
         {
-            List<CandleRawData> candleData = null;
             Vector2[] allWmaData = { new Vector2 { X = 0, Y = 0.064223m }, new Vector2 { X = 0, Y = 0.064123m } };
             Vector2[] allSmmaData = { new Vector2 { X = 0, Y = 0.064123m }, new Vector2 { X = 0, Y = 0.064323m } }; ;
 
-            var result = finder.ExtractFromChart(candleData, allWmaData, allSmmaData);
+            var result = finder.ExtractFromChart(allWmaData, allSmmaData, Symbol);
 
             Assert.NotNull(result);
             Assert.IsNotEmpty(result);
             Assert.AreEqual(result.Count, 1);
             Assert.AreEqual(result.FirstOrDefault().Type, IntersectionType.Upward);
+            Assert.AreEqual(result.FirstOrDefault().Symbol, Symbol);
         }
 
         [Test]
         public void TestMeetingPointIntersection()
         {
-            List<CandleRawData> candleData = null;
             Vector2[] allWmaData = { new Vector2 { X = 0, Y = 0.07201624661684036m }, new Vector2 { X = 0, Y = 0.07202435284852982m }, new Vector2 { X = 0, Y = 0.0720202699303627m } };
             Vector2[] allSmmaData = { new Vector2 { X = 0, Y = 0.07254194468259811m }, new Vector2 { X = 0, Y = 0.07200126349925995m }, new Vector2 { X = 0, Y = 0.07132037729024887m } }; ;
 
-            var result = finder.ExtractFromChart(candleData, allWmaData, allSmmaData);
+            var result = finder.ExtractFromChart(allWmaData, allSmmaData, Symbol);
 
             Assert.NotNull(result);
             Assert.IsNotEmpty(result);
             Assert.AreEqual(result.Count, 1);
             Assert.AreEqual(result.FirstOrDefault().Type, IntersectionType.Downward);
+            Assert.AreEqual(result.FirstOrDefault().Symbol, Symbol);
         }
 
 
         [Test]
         public void TestDoubleIntersection()
         {
-            List<CandleRawData> candleData = null;
             Vector2[] allWmaData =
             {
                 new Vector2 {X = 0, Y = 0.07258408516645432m},
@@ -67,21 +67,22 @@ namespace CanisLupus.Tests
                 new Vector2 { X = 0, Y = 0.07257463783025742m },
                 new Vector2 { X = 0, Y = 0.0728851929306984m},
                 new Vector2 { X = 0, Y = 0.0729970633983612m }
-        }; ;
+            };
 
-            var result = finder.ExtractFromChart(candleData, allWmaData, allSmmaData);
+            var result = finder.ExtractFromChart(allWmaData, allSmmaData, Symbol);
 
             Assert.NotNull(result);
             Assert.IsNotEmpty(result);
             Assert.AreEqual(result.Count, 2);
             Assert.AreEqual(result[0].Type, IntersectionType.Downward);
             Assert.AreEqual(result[1].Type, IntersectionType.Upward);
+            Assert.AreEqual(result[0].Symbol, Symbol);
+            Assert.AreEqual(result[1].Symbol, Symbol);
         }
 
         [Test]
         public void TestSameDoubleIntersectionFiltering()
         {
-             List<CandleRawData> candleData = null;
             Vector2[] allWmaData =
             {
                 new Vector2 {X = 0, Y = 0.07948387644636015m},
@@ -97,12 +98,13 @@ namespace CanisLupus.Tests
                 new Vector2 { X = 0, Y = 0.07959097333333333m }
         }; ;
 
-            var result = finder.ExtractFromChart(candleData, allWmaData, allSmmaData);
+            var result = finder.ExtractFromChart(allWmaData, allSmmaData, Symbol);
 
             Assert.NotNull(result);
             Assert.IsNotEmpty(result);
             Assert.AreEqual(result.Count, 1);
             Assert.AreEqual(result[0].Type, IntersectionType.Upward);
+            Assert.AreEqual(result[0].Symbol, Symbol);
         }
     }
 }

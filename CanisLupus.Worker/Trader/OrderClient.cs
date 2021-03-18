@@ -12,10 +12,11 @@ namespace CanisLupus.Worker.Trader
 {
     public interface IOrderClient
     {
-        Task<List<Order>> FindOpenOrders();
+        Task<List<Order>> FindOpenOrders(string symbol);
         Task<Order> CreateAsync(Order order);
         Task<bool> CancelAsync(string orderId);
         Task<Order> FindByIdAsync(string orderId);
+        Task<Order> UpdateAsync(Order order);
     }
     public class OrderClient : IOrderClient
     {
@@ -97,13 +98,28 @@ namespace CanisLupus.Worker.Trader
             }
         }
 
-        public async Task<List<Order>> FindOpenOrders()
+        public async Task<List<Order>> FindOpenOrders(string symbol)
         {
             var ordersCollection = dbClient.GetCollection<Order>(OrdersCollectionName);
-            Expression<Func<Order, bool>> filter = m => (m.Status == OrderStatus.New || m.Status == OrderStatus.Partial);
+            Expression<Func<Order, bool>> filter = m => ((m.Status == OrderStatus.New || m.Status == OrderStatus.Partial) && m.Symbol == symbol);
             var openOrders = (await ordersCollection.FindAsync<Order>(filter)).ToList();
 
-            return openOrders;
+            List<Order> returnOpenOrders = new List<Order>();
+            foreach(var openOrder in openOrders)
+            {
+                var binanceOrder = await binanceClient.GetOrder(openOrder.Symbol, openOrder.Id);
+                var mappedOrder = binanceOrder.MapToOrder(openOrder);
+                if(mappedOrder.Status != openOrder.Status)
+                {
+                    var updatedOrder = await UpdateAsync(mappedOrder);
+                } 
+                else
+                {
+                    returnOpenOrders.Add(mappedOrder);
+                }
+            }
+
+            return returnOpenOrders;
         }
 
         public async Task<Order> FindByIdAsync(string orderId)
@@ -113,6 +129,20 @@ namespace CanisLupus.Worker.Trader
             var openOrders = (await ordersCollection.FindAsync<Order>(filter)).FirstOrDefault();
 
             return openOrders;
+        }
+
+        public async Task<Order> UpdateAsync(Order order)
+        {
+            var collection = dbClient.GetCollection<Order>(OrdersCollectionName);
+            Expression<Func<Order, bool>> filter = m => (m.Id == order.Id);
+
+            var update = Builders<Order>.Update
+                .Set(m => m.Status, order.Status)
+                .Set(m => m.UpdatedDate, DateTime.Now);
+
+            var updatedIntersection = await collection.FindOneAndUpdateAsync<Order>(filter, update);
+            
+            return order;
         }
     }
 }

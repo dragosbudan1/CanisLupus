@@ -40,5 +40,6 @@ namespace CanisLupus.Common.Models
         [JsonConverter(typeof(StringEnumConverter))]
         [BsonRepresentation(BsonType.String)]
         public IntersectionStatus? Status { get; set; }
+        public string Symbol { get; set; }
     }
 }

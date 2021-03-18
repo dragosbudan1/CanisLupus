@@ -13,6 +13,8 @@ namespace CanisLupus.Tests
 {
     public class BinanceClientTests
     {
+        private BinanceOrderRequest NewTradeRequest;
+        private BinanceOrderRequest FilledTradeRequest;
         private IBinanceClient SUT;
 
         [SetUp]
@@ -27,6 +29,24 @@ namespace CanisLupus.Tests
 
             var dbSettings = Options.Create<BinanceSettings>(settings);
             SUT = new BinanceClient(dbSettings);
+
+            NewTradeRequest = new BinanceOrderRequest()
+            {
+                Symbol = "TRXBNB",
+                Price = 0.0002m,
+                Quantity = 1000m,
+                Side = OrderSide.Buy,
+                StopPrice = 0.00015m,
+            };
+
+            FilledTradeRequest = new BinanceOrderRequest()
+            {
+                Symbol = "TRXBNB",
+                Price = 0.0005m,
+                Quantity = 1000m,
+                Side = OrderSide.Buy,
+                StopPrice = 0.00015m,
+            };
         }
 
         [TearDown]
@@ -38,15 +58,9 @@ namespace CanisLupus.Tests
         [Test]
         public async Task TestCanCreateBinanceBuyOrder()
         {
-            var req = new BinanceOrderRequest()
-            {
-                Symbol = "TRXBNB",
-                Price = 0.001m,
-                Quantity = 100m,
-                Side = OrderSide.Buy
-            };
+            var req = NewTradeRequest;
 
-            var result = await SUT.CreateOrder(req);
+            var result = await SUT.CreateOrder(NewTradeRequest);
 
             Assert.IsNotNull(result);
             Assert.AreEqual(result.Symbol, req.Symbol);
@@ -59,13 +73,7 @@ namespace CanisLupus.Tests
         [Test]
         public async Task TestCanGetOpenOrders()
         {
-            var req = new BinanceOrderRequest()
-            {
-                Symbol = "TRXBNB",
-                Price = 0.001m,
-                Quantity = 100m,
-                Side = OrderSide.Buy
-            };
+            var req = NewTradeRequest;
 
             var buyOrder = await SUT.CreateOrder(req);
 
@@ -79,19 +87,13 @@ namespace CanisLupus.Tests
         [Test]
         public async Task TestCancelAllOrders()
         {
-            var req = new BinanceOrderRequest()
-            {
-                Symbol = "TRXBNB",
-                Price = 0.001m,
-                Quantity = 100m,
-                Side = OrderSide.Buy
-            };
+            var req = NewTradeRequest;
 
             var req2 = new BinanceOrderRequest()
             {
                 Symbol = "TRXBNB",
-                Price = 0.001m,
-                Quantity = 100m,
+                Price = 0.0002m,
+                Quantity = 1000m,
                 Side = OrderSide.Buy
             };
 
@@ -114,13 +116,7 @@ namespace CanisLupus.Tests
         [Test]
         public async Task TestCanCancelOrder()
         {
-            var req = new BinanceOrderRequest()
-            {
-                Symbol = "TRXBNB",
-                Price = 0.001m,
-                Quantity = 100m,
-                Side = OrderSide.Buy
-            };
+            var req = NewTradeRequest;
 
             var buyOrder = await SUT.CreateOrder(req);
             var cancelledOrder = await SUT.CancelOrder(req.Symbol, req.ClientOrderId);
@@ -133,13 +129,7 @@ namespace CanisLupus.Tests
         [Test]
         public async Task TestCanGetOrderById()
         {
-            var req = new BinanceOrderRequest()
-            {
-                Symbol = "TRXBNB",
-                Price = 0.001m,
-                Quantity = 100m,
-                Side = OrderSide.Buy
-            };
+            var req = NewTradeRequest;
 
             var buyOrder = await SUT.CreateOrder(req);
             var order = await SUT.GetOrder(req.Symbol, req.ClientOrderId);
@@ -148,6 +138,29 @@ namespace CanisLupus.Tests
             Assert.AreEqual(order.Status, "NEW");
             Assert.AreEqual(order.ClientOrderId, req.ClientOrderId);
         }
+
+        [Test]
+        public async Task TestSymbolValidation()
+        {
+            var valid = await SUT.ValidateSymbolInfo("TRXBNB");
+            var invalid = await SUT.ValidateSymbolInfo("BLABLABLA");
+
+            Assert.IsTrue(valid);
+            Assert.IsFalse(invalid);
+        }
+
+        // [Test]
+        // public async Task TestCanFilledOrder()
+        // {
+        //     var req = FilledTradeRequest;
+
+        //     var buyOrder = await SUT.CreateOrder(req);
+        //     var order = await SUT.GetOrder(req.Symbol, req.ClientOrderId);
+
+        //     Assert.IsNotNull(order);
+        //     Assert.AreEqual(order.Status, "FILLED");
+        //     Assert.AreEqual(order.ClientOrderId, req.ClientOrderId);
+        // }
 
         // [Test]
         // public async Task TestGenerateHMAC()

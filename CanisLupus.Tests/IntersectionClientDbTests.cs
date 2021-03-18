@@ -40,8 +40,8 @@ namespace CanisLupus.Tests
         public async Task TearDown()
         {
             var collection = dbClient.GetCollection<Intersection>(IntersectionClient.IntersectionsCollectionName);
-            Expression<Func<Intersection, bool>> filter = m => (m.Point.Y == intersection.Point.Y && m.Type == intersection.Type);
-            await collection.DeleteOneAsync(filter);
+            Expression<Func<Intersection, bool>> filter = m => (m.Id != null);
+            await collection.DeleteManyAsync(filter);
         }
 
         [Test]
@@ -56,15 +56,30 @@ namespace CanisLupus.Tests
                 },
                 Status = IntersectionStatus.Active,
                 Type = IntersectionType.Undefined,
+                Symbol = "BTCUSDT"
             };
 
+            var otherSymbolIntersection = new Intersection()
+            {
+                Point = new Vector2
+                {
+                    X = 0.123456123456m,
+                    Y = 0.123456123456m,
+                },
+                Status = IntersectionStatus.Active,
+                Type = IntersectionType.Undefined,
+                Symbol = "ADAUSDT"
+            };
+
+            var otherInsertResult = await SUT.InsertAsync(otherSymbolIntersection); 
             var insertResult = await SUT.InsertAsync(intersection);
             var existingIntersection = await SUT.FindByIntersectionDetails(intersection);
 
             Assert.IsNotNull(insertResult);
             Assert.IsNotNull(existingIntersection);
             Assert.AreEqual(existingIntersection.Type, intersection.Type);
-            Assert.AreEqual(existingIntersection.Point.Y, existingIntersection.Point.Y);
+            Assert.AreEqual(existingIntersection.Point.Y, intersection.Point.Y);
+            Assert.AreEqual(existingIntersection.Symbol, intersection.Symbol);
         }
 
         [Test]
@@ -79,12 +94,13 @@ namespace CanisLupus.Tests
                 },
                 Status = IntersectionStatus.Active,
                 Type = IntersectionType.Undefined,
+                Symbol = "BTCUSDT"
             };
 
         
             var insertResult = await SUT.InsertAsync(intersection);
          
-            Assert.IsNotNull(insertResult);
+            Assert.IsTrue(insertResult);
         }
 
         [Test]
@@ -99,6 +115,7 @@ namespace CanisLupus.Tests
                 },
                 Status = IntersectionStatus.Active,
                 Type = IntersectionType.Undefined,
+                Symbol = "BTCUSDT"
             };
 
             var updatedIntersection = intersection;
@@ -113,6 +130,7 @@ namespace CanisLupus.Tests
             Assert.AreEqual(result.Type, updatedIntersection.Type);
             Assert.AreEqual(result.Status, updatedIntersection.Status);
             Assert.AreEqual(result.Point.X, updatedIntersection.Point.X);
+            Assert.AreEqual(result.Symbol, updatedIntersection.Symbol);
         }
     }
 }

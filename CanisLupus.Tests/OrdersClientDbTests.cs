@@ -1,17 +1,12 @@
 using System;
-using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using CanisLupus.Common.Database;
 using CanisLupus.Common.Models;
-using CanisLupus.Worker.Algorithms;
-using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Exchange;
 using CanisLupus.Worker.Trader;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Moq;
 using NUnit.Framework;
 
 namespace CanisLupus.Tests
@@ -54,8 +49,8 @@ namespace CanisLupus.Tests
         {
             var order = new Order()
             {
-                Quantity = 100m,
-                Price = 0.001m,
+                Quantity = 1000m,
+                Price = 0.0002m,
                 ProfitPercentage = 2,
                 Side = OrderSide.Buy,
                 SpendAmount = 1000,
@@ -77,8 +72,8 @@ namespace CanisLupus.Tests
         {
             var order = new Order()
             {
-                Quantity = 100m,
-                Price = 0.001m,
+                Quantity = 1000m,
+                Price = 0.0002m,
                 ProfitPercentage = 2,
                 Side = OrderSide.Buy,
                 SpendAmount = 1000,
@@ -97,44 +92,49 @@ namespace CanisLupus.Tests
         [Test]
         public async Task FindOpenOrdersTest()
         {
-            // var openOrder1 = new Order()
-            // {
-            //     Amount = 12.456m,
-            //     Price = 12.456m,
-            //     ProfitPercentage = 2,
-            //     Type = OrderType.Buy,
-            //     Spend = 1000,
-            //     StopLossPercentage = 10
-            // };
+            var order = new Order()
+            {
+                Quantity = 1000m,
+                Price = 0.0002m,
+                ProfitPercentage = 2,
+                Side = OrderSide.Buy,
+                SpendAmount = 1000,
+                StopLossPercentage = 10,
+                Symbol = "TRXBNB",
+            };
 
-            // var openOrder2 = new Order()
-            // {
-            //     Amount = 12.456m,
-            //     Price = 12.456m,
-            //     ProfitPercentage = 2,
-            //     Type = OrderType.Buy,
-            //     Spend = 1000,
-            //     StopLossPercentage = 10
-            // };
+            var order2 = new Order()
+            {
+                Quantity = 1000m,
+                Price = 0.0002m,
+                ProfitPercentage = 2,
+                Side = OrderSide.Buy,
+                SpendAmount = 1000,
+                StopLossPercentage = 10,
+                Symbol = "TRXBNB",
+            };
 
-            // var closedOrder = new Order()
-            // {
-            //     Amount = 12.456m,
-            //     Price = 12.456m,
-            //     ProfitPercentage = 2,
-            //     Type = OrderType.Buy,
-            //     Spend = 1000,
-            //     StopLossPercentage = 10
-            // };
+            var order3 = new Order()
+            {
+                Quantity = 1000m,
+                Price = 0.0002m,
+                ProfitPercentage = 2,
+                Side = OrderSide.Buy,
+                SpendAmount = 1000,
+                StopLossPercentage = 10,
+                Symbol = "TRXBNB",
+            };
 
-            // await SUT.CreateAsync(openOrder1);
-            // await SUT.CreateAsync(openOrder2);
-            // await SUT.CreateAsync(closedOrder);
-            // await SUT.UpdateOrderAsync(closedOrder.Id, OrderStatus.Cancelled);
-            // var orders = await SUT.FindOpenOrders();
+            await SUT.CreateAsync(order);
+            await SUT.CreateAsync(order2);
+            await SUT.CreateAsync(order3);
+            var cancelled = await SUT.CancelAsync(order.Id);
+            var result = await SUT.FindOpenOrders(order.Symbol);
 
-            // Assert.IsNotNull(orders);
-            // Assert.AreEqual(orders.Count, 2);
+            Assert.IsNotNull(result);
+            Assert.AreEqual(result.Count, 2);
+            Assert.AreEqual(result[0].Id, order2.Id);
+            Assert.AreEqual(result[1].Id, order3.Id);
         }
     }
 }

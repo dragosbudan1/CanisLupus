@@ -36,10 +36,16 @@ namespace CanisLupus.Web.Controllers
             return Task.FromResult(true);
         }
 
-        [HttpGet]
-        public async Task<object> Get()
+        [HttpGet()]
+        public async Task<object> Get(string symbol)
         {
-            var viewData = await eventReceiver.ReceiveAsync<ViewData>("viewData");
+            if(string.IsNullOrEmpty(symbol))
+            {
+                logger.Info("empty");
+                return null;
+            }
+
+            var viewData = await eventReceiver.ReceiveAsync<ViewData>($"viewData-{symbol}");
 
             logger.Info("returning data");
             var workerData = MapToWorkerData(viewData);

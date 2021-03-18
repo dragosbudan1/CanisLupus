@@ -6,6 +6,7 @@ using CanisLupus.Worker.Extensions;
 using CanisLupus.Common.Models;
 using NLog;
 using Microsoft.Extensions.Options;
+using System.Linq;
 
 namespace CanisLupus.Worker.Exchange
 {
@@ -18,6 +19,7 @@ namespace CanisLupus.Worker.Exchange
         Task<List<BinanceOrderResponse>> CancelAllOrders(string symbol);
         Task<BinanceOrderResponse> CancelOrder(string symbol, string orderId);
         Task<BinanceOrderResponse> GetOrder(string symbol, string clientOrderId);
+        Task<bool> ValidateSymbolInfo(string symbol);
     }
 
     public class BinanceClient : IBinanceClient
@@ -229,6 +231,29 @@ namespace CanisLupus.Worker.Exchange
             {
                 logger.Error(ex, "Error get order");
                 return null;
+            }
+        }
+
+        public async Task<bool> ValidateSymbolInfo(string pairName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(pairName))
+                    throw new ArgumentNullException(nameof(pairName));
+
+                var client = new HttpClient();
+                var response = await client.GetAsync($"{settings.Url}/exchangeInfo");
+                response.EnsureSuccessStatusCode();
+
+                var content = await response.Content.ReadAsStringAsync();
+                var exchangeInfo = BinanceHelpers.MapResponseToListSymbolInfo(content);
+
+                return exchangeInfo.Symbols.Any(x => x.Symbol == pairName && x.IsSpotTradingAllowed == true);
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Error validating pair name", new { pairName });
+                return false;
             }
         }
 

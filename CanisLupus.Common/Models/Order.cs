@@ -39,6 +39,8 @@ namespace CanisLupus.Common.Models
         New = 0,
         Partial,
         Filled,
-        Cancelled
+        Cancelled,
+        Rejected,
+        Expired
     }
 }

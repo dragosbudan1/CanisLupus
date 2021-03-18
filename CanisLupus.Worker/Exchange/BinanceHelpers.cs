@@ -17,13 +17,13 @@ namespace CanisLupus.Worker.Exchange
 
             return new CandleRawData()
             {
-                OpenTime = UnixTimeStampToDateTime(jarray[0][0].Value<long>()),
+                OpenTime = UnixTimeStampToDateTime(jarray[0][0].Value<long>()).GetValueOrDefault(),
                 Open = Convert.ToDecimal(jarray[0][1].Value<string>()),
                 High = Convert.ToDecimal(jarray[0][2].Value<string>()),
                 Low = Convert.ToDecimal(jarray[0][3].Value<string>()),
                 Close = Convert.ToDecimal(jarray[0][4].Value<string>()),
                 Volume = jarray[0][5].Value<string>(),
-                CloseTime = UnixTimeStampToDateTime(jarray[0][6].Value<long>()),
+                CloseTime = UnixTimeStampToDateTime(jarray[0][6].Value<long>()).GetValueOrDefault(),
                 QuoteAssetVolume = jarray[0][7].Value<string>(),
                 NumberOfTrades = jarray[0][8].Value<long>(),
             };
@@ -49,26 +49,43 @@ namespace CanisLupus.Worker.Exchange
                 SpendAmount = origOrder.SpendAmount,
                 Status = MapToOrderStatus(response.Status),
                 Side = MapToOrderType(response.Side),
-                CreatedDate = UnixTimeStampToDateTime((double)response.TransactTime),
-                UpdatedDate = UnixTimeStampToDateTime((double)response.TransactTime)
+                CreatedDate = UnixTimeStampToDateTime(response?.TransactTime) ?? origOrder.CreatedDate,
+                UpdatedDate = UnixTimeStampToDateTime(response?.TransactTime) ?? origOrder.UpdatedDate
             };
         }
 
-        public static OrderStatus MapToOrderStatus(string respStauts)
+        public static OrderStatus MapToOrderStatus(string respStatus)
         {
-            switch(respStauts)
+            switch (respStatus)
             {
                 case "CANCELED":
                     return OrderStatus.Cancelled;
                 case "NEW":
-                default:
                     return OrderStatus.New;
+                case "PARTIALLY_FILLED":
+                    return OrderStatus.Partial;
+                case "FILLED":
+                    return OrderStatus.Filled;
+                case "REJECTED":
+                    return OrderStatus.Rejected;
+                case "EXPIRED":
+                    return OrderStatus.Expired;
+                default:
+                    throw new ArgumentException($"{respStatus} is not valid");
             }
         }
 
+        /*NEW	The order has been accepted by the engine.
+        PARTIALLY_FILLED	A part of the order has been filled.
+        FILLED	The order has been completed.
+        CANCELED	The order has been canceled by the user.
+        PENDING_CANCEL	Currently unused
+        REJECTED	The order was not accepted by the engine and not processed.
+        EXPIRED	The order was canceled according to the order type's rules (e.g. LIMIT FOK orders with no fill, LIMIT IOC or MARKET orders that partially fill) or by the exchange, (e.g. orders canceled during liquidation, orders canceled during maintenance)*/
+
         public static OrderSide MapToOrderType(string respType)
         {
-            switch(respType)
+            switch (respType)
             {
                 case "SELL":
                     return OrderSide.Sell;
@@ -100,13 +117,13 @@ namespace CanisLupus.Worker.Exchange
             {
                 var candle = new CandleRawData()
                 {
-                    OpenTime = UnixTimeStampToDateTime(item[0].Value<long>()),
+                    OpenTime = UnixTimeStampToDateTime(item[0].Value<long>()).Value,
                     Open = Convert.ToDecimal(item[1].Value<string>()),
                     High = Convert.ToDecimal(item[2].Value<string>()),
                     Low = Convert.ToDecimal(item[3].Value<string>()),
                     Close = Convert.ToDecimal(item[4].Value<string>()),
                     Volume = item[5].Value<string>(),
-                    CloseTime = UnixTimeStampToDateTime(item[6].Value<long>()),
+                    CloseTime = UnixTimeStampToDateTime(item[6].Value<long>()).Value,
                     QuoteAssetVolume = item[7].Value<string>(),
                     NumberOfTrades = item[8].Value<long>(),
                 };
@@ -115,6 +132,12 @@ namespace CanisLupus.Worker.Exchange
             }
 
             return list;
+        }
+
+        public static ExchangeInfo MapResponseToListSymbolInfo(string contentResponse)
+        {
+            var exchangeInfo = JsonConvert.DeserializeObject<ExchangeInfo>(contentResponse);
+            return exchangeInfo;
         }
 
         public static string GetTradeQueryString(string timestamp, string symbol = "BTCUSDT", OrderSide side = OrderSide.Sell, decimal? quantity = 0.01m, decimal? price = 46000m)
@@ -188,17 +211,16 @@ namespace CanisLupus.Worker.Exchange
             return currentTimestamp.ToString();
         }
 
-        public static DateTime UnixTimeStampToDateTime(double unixTimeStamp)
+        public static DateTime? UnixTimeStampToDateTime(long? unixTimeStamp)
         {
+            if(unixTimeStamp == null)
+            {
+                return null;
+            }
             // Unix timestamp is seconds past epoch
             System.DateTime dtDateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
-            dtDateTime = dtDateTime.AddMilliseconds(unixTimeStamp).ToLocalTime();
+            dtDateTime = dtDateTime.AddMilliseconds(unixTimeStamp.Value).ToLocalTime();
             return dtDateTime;
-        }
-
-        internal static HttpRequestMessage CreateTradeRequest()
-        {
-            throw new NotImplementedException();
         }
     }
 }

@@ -1,11 +1,13 @@
 import React, { Component } from 'react';
-import axios from 'axios';
 import { withRouter } from 'react-router-dom';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ScatterChart, ZAxis, Scatter, BarChart, Bar, Cell, ComposedChart
 } from 'recharts';
 import ViewControls from './ViewControls'
 import LogsDisplay from './LogsDisplay'
+import { getViewData } from './viewDataService'
+import { getAllTradingSettings, updateTradingSettings } from './tradingSettingsService'
+import Select from 'react-select'
 
 const workerData = [
   {
@@ -81,7 +83,10 @@ export class Home extends Component {
       chartViewSwitch: false,
       tradingLogs: ['Waiting for logs'],
       lastUpdated: null,
-      currentSymbol: "hello"
+      currentSymbol: "DOGEUSDT",
+      tradingSettings: [],
+      selectSettings: [],
+      currentTrade: null
       //tradingInfo: 'Waiting for trading info'
     };
 
@@ -89,6 +94,13 @@ export class Home extends Component {
     this.onChangeChartView = this.onChangeChartView.bind(this)
     this.onChangeSymbol = this.onChangeSymbol.bind(this)
     this.onUpdateSymbol = this.onUpdateSymbol.bind(this)
+    this.getTradingSettings = this.getTradingSettings.bind(this)
+    this.handleProfitPercentageChange = this.handleProfitPercentageChange.bind(this)
+    this.handleSettingsUpdate = this.handleSettingsUpdate.bind(this)
+    this.handleSpendLimitChange = this.handleSpendLimitChange.bind(this)
+    this.handleTotalSpendLimitChange = this.handleTotalSpendLimitChange.bind(this)
+    this.handleStopLossPercentageChange = this.handleStopLossPercentageChange.bind(this)
+    this.handleTradingStatusChange = this.handleTradingStatusChange.bind(this)
   }
   static displayName = Home.name;
 
@@ -97,73 +109,149 @@ export class Home extends Component {
   };
 
   async _loadAsyncData() {
-    await this.getWorkerData()
+    await this.getTradingSettings()
+    // await this.getWorkerData()
   }
 
-  // setWorkerDataQueue() {
-  //   axios.post("/workerData", {
-  //     id: this.state.sessionId
-  //   }).then(result => {
-  //     console.log('set id' + this.state.sessionId)
-  //   }).catch(err => console.log(err))
-  // }
-
-  async getWorkerData() {
-    axios.get(`/workerData`)
-      .then(result => {
-        if (result.data !== null && result.data.candleData !== null) {
-          console.log(result.data)
-
-          let lineData = result.data.candleData.map((x, i) => {
-            return {
-              time: i,
-              top: x.top,
-              bottom: x.bottom
-            }
-          })
-
-          let candleData = result.data.candleData.map((x, i) => {
-            return {
-              time: i,
-              value: [x.bottom.toFixed(5), x.top.toFixed(5)],
-              fill: x.orientation < 0 ? 'red' : 'green',
-              wma: x.wma.toFixed(5),
-              smma: x.smma.toFixed(5)
-            }
-          })
-
-          var minChart = Math.min(result.data.candleData.map(x => x.bottom))
-          var maxChart = Math.max(result.data.candleData.map(x => x.top))
-
-          this.setState({
-            lineData: lineData,
-            candleData: candleData,
-            minChart: minChart,
-            maxChart: maxChart,
-            lastUpdated: new Date().toUTCString(),
-            tradingLogs: result.data.tradingLogsData,
-            //tradingInfo: result.data.tradingInfo
-          })
+  async getTradingSettings() {
+    var result = await getAllTradingSettings();
+    console.log(result)
+    if (result !== null) {
+      const options = result.map(x => {
+        return {
+          label: x.symbol,
+          value: x.symbol
         }
+      });
 
-        this.getWorkerData()
-      }).catch(err => console.log(err))
+      this.setState({
+        tradingSettings: result,
+        selectSettings: options
+      });
+    }
   }
 
-  onChangeChartView(enabled) { 
+  async getWorkerData(symbol) {
+    let data = await getViewData(symbol);
+    if (data !== null && data.candleData !== null) {
+      console.log(data)
+
+      let lineData = data.candleData.map((x, i) => {
+        return {
+          time: i,
+          top: x.top,
+          bottom: x.bottom
+        }
+      })
+
+      let candleData = data.candleData.map((x, i) => {
+        return {
+          time: i,
+          value: [x.bottom.toFixed(5), x.top.toFixed(5)],
+          fill: x.orientation < 0 ? 'red' : 'green',
+          wma: x.wma.toFixed(5),
+          smma: x.smma.toFixed(5)
+        }
+      })
+
+      var minChart = Math.min(data.candleData.map(x => x.bottom))
+      var maxChart = Math.max(data.candleData.map(x => x.top))
+
+      this.setState({
+        lineData: lineData,
+        candleData: candleData,
+        minChart: minChart,
+        maxChart: maxChart,
+        lastUpdated: new Date().toUTCString(),
+        tradingLogs: data.tradingLogsData
+      })
+    }
+    this.getWorkerData(symbol)
+  }
+
+  onChangeChartView(enabled) {
     this.setState({
       chartViewSwitch: enabled
     })
   }
 
-  onChangeSymbol(e) {
+  async onChangeSymbol(e) {
+
+    var settings = this.state.tradingSettings.find(x => x.symbol == e.value)
+
     this.setState({
-      currentSymbol: e.target.value
-    })
+      currentTrade: settings
+    });
+
+    await this.getWorkerData(e.value)
+
   }
 
   onUpdateSymbol() {
     console.log(this.state.currentSymbol)
+  }
+
+  handleProfitPercentageChange(e) {
+    let value = this.parseFloatOrNan(e.target.value)
+    if (isNaN(value) !== true) {
+      let tradingSettings = this.state.currentTrade
+      tradingSettings.profitPercentage = value
+      this.setState({
+        currentTrade: tradingSettings
+      })
+    }
+  }
+
+  parseFloatOrNan(value) {
+    let result = parseFloat(value)
+    return isNaN(result) ? 0 : result
+  }
+
+  handleStopLossPercentageChange(e) {
+    let value = this.parseFloatOrNan(e.target.value)
+    let tradingSettings = this.state.currentTrade
+    tradingSettings.stopLossPercentage = value
+    this.setState({
+      currentTrade: tradingSettings
+    })
+  }
+
+  handleSpendLimitChange(e) {
+    let value = this.parseFloatOrNan(e.target.value)
+    let tradingSettings = this.state.currentTrade
+    tradingSettings.spendLimit = value
+    this.setState({
+      currentTrade: tradingSettings
+    })
+  }
+
+  async handleSettingsUpdate(e) {
+    var result = await updateTradingSettings(this.state.currentTrade)
+    if(result !== null) {
+      this.setState({
+        currentTrade: result
+      })
+    }
+  }
+
+  handleTotalSpendLimitChange(e) {
+    let value = this.parseFloatOrNan(e.target.value)
+    let tradingSettings = this.state.currentTrade
+    tradingSettings.totalSpendLimit = value
+    this.setState({
+      currentTrade: tradingSettings
+    })
+  }
+
+  handleTradingStatusChange(e) {
+    console.log(e.target.checked)
+    let value = e.target.checked
+    let tradingSettings = this.state.currentTrade
+    tradingSettings.tradingStatus = value ? 2 : 0
+    this.setState({
+      currentTrade: tradingSettings
+    })
+
   }
 
   renderViewControls() {
@@ -223,6 +311,43 @@ export class Home extends Component {
     )
   }
 
+  renderSettingsUpdate() {
+    return (
+      <div>
+        <div className="row">
+          <label>
+            Profit %:
+          <input type="text" value={this.state.currentTrade.profitPercentage} onChange={this.handleProfitPercentageChange} />
+          </label>
+          <label>
+            Spend Limit:
+          <input type="text" value={this.state.currentTrade.spendLimit} onChange={this.handleSpendLimitChange} />
+          </label>
+        </div>
+        <div className="row">
+          <label>
+            Stop Loss %:
+          <input type="text" value={this.state.currentTrade.stopLossPercentage} onChange={this.handleStopLossPercentageChange} />
+          </label>
+          <label>
+            Total Spend Limit:
+          <input type="text" value={this.state.currentTrade.totalSpendLimit} onChange={this.handleTotalSpendLimitChange} />
+          </label>
+        </div>
+        <div className="row">
+          <label>
+            Trading Active:
+          <input type="checkbox" value={this.state.currentTrade.tradingStatus} checked={this.state.currentTrade.tradingStatus} onChange={this.handleTradingStatusChange} />
+          </label>
+        </div>
+        <button
+          onClick={this.handleSettingsUpdate}>
+          UpdateSettings
+        </button>
+      </div>
+    );
+  }
+
   render() {
     return (
       <div>
@@ -236,15 +361,12 @@ export class Home extends Component {
           {this.state.chartViewSwitch && this.renderLineChart()}
           {!this.state.chartViewSwitch && this.renderCandlesChart()}
         </div>
-        <div className="row">
-            <label>
-              Symbol:
-          <input type="text" value={this.state.currentSymbol} onChange={this.onChangeSymbol} />
-            </label>
-            <button onClick={this.onUpdateSymbol}>
-              Update
-            </button>
-          </div>
+        <div>
+          <Select options={this.state.selectSettings} onChange={this.onChangeSymbol} />
+        </div>
+        <div>
+          {this.state.currentTrade && this.renderSettingsUpdate()}
+        </div>
         <div>
           <LogsDisplay logs={this.state.tradingLogs} />
         </div>

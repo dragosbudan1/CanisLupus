@@ -22,7 +22,7 @@ namespace CanisLupus.Tests
         private Mock<IIntersectionClient> mockIntersectionClient;
         private Mock<IWeightedMovingAverageCalculator> mockWMACalculator;
         private Mock<IOrderClient> mockOrderClient;
-        private Mock<ITradingSettingsClient> mockTradingSettingsClient;
+        private Mock<ITradingSettingsService> mockTradingSettingsClient;
         private Mock<ITradingClient> mockTradingClient;
 
         [SetUp]
@@ -34,7 +34,7 @@ namespace CanisLupus.Tests
             mockTradingClient = new Mock<ITradingClient>();
             mockWMACalculator = new Mock<IWeightedMovingAverageCalculator>();
             mockOrderClient = new Mock<IOrderClient>();
-            mockTradingSettingsClient = new Mock<ITradingSettingsClient>();
+            mockTradingSettingsClient = new Mock<ITradingSettingsService>();
 
             SUT = new MarketMakerHandler(
                 mockBinanceClient.Object,
@@ -69,10 +69,16 @@ namespace CanisLupus.Tests
                 newestIntersection
             };
 
-            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(), It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<string>(), It.IsAny<int?>()))
                 .Returns(intersections);
 
-            await SUT.ExecuteAsync(new System.Threading.CancellationToken());
+
+            var tradingSettings = new TradingSettings()
+            {
+                Symbol = "DOGEUSDT"
+            };
+
+            await SUT.ExecuteAsync(tradingSettings);
 
             mockIntersectionClient.Verify(x => x.InsertAsync(It.Is<Intersection>(s =>
                 s.Point == newestIntersection.Point &&
@@ -99,8 +105,7 @@ namespace CanisLupus.Tests
                 existingIntersection
             };
 
-            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(),
-                It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<string>(), It.IsAny<int?>()))
                 .Returns(intersections);
 
             var updatedIntersection = existingIntersection;
@@ -114,8 +119,14 @@ namespace CanisLupus.Tests
 
             mockIntersectionClient.Setup(x => x.UpdateAsync(It.Is<Intersection>(s => s.Id == dbGeneratedId)))
                 .ReturnsAsync(updatedIntersection);
+            
 
-            await SUT.ExecuteAsync(new System.Threading.CancellationToken());
+            var tradingSettings = new TradingSettings()
+            {
+                Symbol = "DOGEUSDT"
+            };
+
+            await SUT.ExecuteAsync(tradingSettings);
 
             mockIntersectionClient.Verify(x => x.InsertAsync(It.IsAny<Intersection>()), Times.Never);
             mockIntersectionClient.Verify(x => x.UpdateAsync(It.Is<Intersection>(s =>
@@ -142,8 +153,7 @@ namespace CanisLupus.Tests
                 existingIntersection
             };
 
-            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(),
-                It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<string>(), It.IsAny<int?>()))
                 .Returns(intersections);
 
             mockIntersectionClient.Setup(x => x.FindByIntersectionDetails(It.Is<Intersection>(s =>
@@ -157,7 +167,13 @@ namespace CanisLupus.Tests
             mockIntersectionClient.Setup(x => x.UpdateAsync(It.Is<Intersection>(s => s.Id == dbGeneratedId)))
                 .ReturnsAsync(updatedIntersection);
 
-            await SUT.ExecuteAsync(new System.Threading.CancellationToken());
+            
+            var tradingSettings = new TradingSettings()
+            {
+                Symbol = "DOGEUSDT"
+            };
+
+            await SUT.ExecuteAsync(tradingSettings);
 
             mockIntersectionClient.Verify(x => x.InsertAsync(It.IsAny<Intersection>()), Times.Never);
             mockIntersectionClient.Verify(x => x.UpdateAsync(It.Is<Intersection>(s =>
@@ -184,11 +200,15 @@ namespace CanisLupus.Tests
                 existingIntersection
             };
 
-            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(),
-                It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<string>(), It.IsAny<int?>()))
                 .Returns(intersections);
 
-            await SUT.ExecuteAsync(new System.Threading.CancellationToken());
+            var tradingSettings = new TradingSettings()
+            {
+                Symbol = "DOGEUSDT"
+            };
+
+            await SUT.ExecuteAsync(tradingSettings);
         }
 
         [Test]
@@ -213,20 +233,32 @@ namespace CanisLupus.Tests
                 SpendLimit = 10,
                 ProfitPercentage = 2,
                 StopLossPercentage = 5,
-                TotalSpendLimit = 100
+                TotalSpendLimit = 100,
+                Symbol = "DOGEUSDT"
             };
 
-            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(), It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
+            var newOrder = new Order()
+            {
+                Price = newIntersection.Point.Y,
+                SpendAmount = tradingsSettings.SpendLimit,
+                ProfitPercentage = tradingsSettings.ProfitPercentage,
+                StopLossPercentage = tradingsSettings.StopLossPercentage,
+                Quantity = tradingsSettings.SpendLimit / newIntersection.Point.Y,
+                Side = OrderSide.Buy
+            };
+
+            mockOrderClient.Setup(x => x.CreateAsync(It.IsAny<Order>())).ReturnsAsync(newOrder);
+
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<string>(), It.IsAny<int?>()))
                 .Returns(intersections);
 
             mockIntersectionClient.Setup(x => x.InsertAsync(It.IsAny<Intersection>())).ReturnsAsync(true);
 
-            mockTradingSettingsClient.Setup(x => x.GetAsync()).ReturnsAsync(tradingsSettings);    
+            mockTradingSettingsClient.Setup(x => x.GetAsync(tradingsSettings.Symbol)).ReturnsAsync(tradingsSettings);    
 
-            await SUT.ExecuteAsync(new System.Threading.CancellationToken());
+            await SUT.ExecuteAsync(tradingsSettings);
 
-            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<List<CandleRawData>>(),
-                It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<int?>()))
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<string>(), It.IsAny<int?>()))
                 .Returns(intersections);
 
             mockOrderClient.Verify(x => x.CreateAsync(It.Is<Order>(s =>
@@ -236,6 +268,57 @@ namespace CanisLupus.Tests
                 s.StopLossPercentage == tradingsSettings.StopLossPercentage &&
                 s.Quantity == tradingsSettings.SpendLimit / newIntersection.Point.Y &&
                 s.Side == OrderSide.Buy)), Times.Once);
+
+            mockTradingClient.Verify(x => x.CreateActiveTrade(It.Is<Trade>(m => 
+                m.OrderId == newOrder.Id &&
+                m.StartSpend == newOrder.SpendAmount &&
+                m.Symbol == newOrder.Symbol)), Times.Once);
+        }
+
+        [Test]
+        public async Task TestNewIntersectionAndOpenOrders()
+        {
+            var newIntersection = new Intersection
+            {
+                Id = null,
+                Point = new Vector2(57, 0.0745123m),
+                Status = null,
+                Type = IntersectionType.Upward
+            };
+
+            var intersections = new List<Intersection>
+            {
+                newIntersection
+            };
+
+            var tradingsSettings = new TradingSettings
+            {
+                TradingStatus = TradingStatus.Active,
+                SpendLimit = 10,
+                ProfitPercentage = 2,
+                StopLossPercentage = 5,
+                TotalSpendLimit = 100,
+                Symbol = "DOGEUSDT"
+            };
+
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<string>(), It.IsAny<int?>()))
+                .Returns(intersections);
+
+            mockIntersectionClient.Setup(x => x.InsertAsync(It.IsAny<Intersection>())).ReturnsAsync(true);
+
+            mockTradingSettingsClient.Setup(x => x.GetAsync(tradingsSettings.Symbol)).ReturnsAsync(tradingsSettings);
+
+            mockOrderClient.Setup(x => x.FindOpenOrders(tradingsSettings.Symbol)).ReturnsAsync(new List<Order>()
+            {
+                new Order { Status = OrderStatus.New }
+            });  
+
+            await SUT.ExecuteAsync(tradingsSettings);
+
+            mockIntersectionClient.Setup(x => x.ExtractFromChart(It.IsAny<Vector2[]>(), It.IsAny<Vector2[]>(), It.IsAny<string>(), It.IsAny<int?>()))
+                .Returns(intersections);
+
+            mockOrderClient.Verify(x => x.CreateAsync(It.IsAny<Order>()), Times.Never);
         }
     }
 }

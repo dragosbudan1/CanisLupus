@@ -11,7 +11,7 @@ namespace CanisLupus.Worker.Trader
 {
     public interface ITradingClient
     {
-        Task<List<Trade>> FindActiveTrades();
+        Task<List<Trade>> FindActiveTrades(string symbol);
         Task<Trade> CreateActiveTrade(Trade trade);
         Task<Trade> CloseTrade(string tradeId, Order trade);
         Task<Trade> UpdateTrade(string tradeId, Order order);
@@ -52,10 +52,10 @@ namespace CanisLupus.Worker.Trader
             return result;
         }
 
-        public async Task<List<Trade>> FindActiveTrades()
+        public async Task<List<Trade>> FindActiveTrades(string symbol)
         {
             var tradesCollection = dbClient.GetCollection<Trade>(TradesCollectionName);
-            Expression<Func<Trade, bool>> filter = m => (m.TradeStatus == TradeStatus.Active);
+            Expression<Func<Trade, bool>> filter = m => (m.TradeStatus == TradeStatus.Active && m.Symbol == symbol);
             var openOrders = (await tradesCollection.FindAsync<Trade>(filter)).ToList();
 
             return openOrders;

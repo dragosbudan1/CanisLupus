@@ -4,13 +4,9 @@ using System.Linq.Expressions;
 using System.Threading.Tasks;
 using CanisLupus.Common.Database;
 using CanisLupus.Common.Models;
-using CanisLupus.Worker.Algorithms;
-using CanisLupus.Worker.Events;
 using CanisLupus.Worker.Trader;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Moq;
 using NUnit.Framework;
 
 namespace CanisLupus.Tests
@@ -50,9 +46,9 @@ namespace CanisLupus.Tests
         {
             var trade = new Trade()
             {
-                OrderId = "12223",
                 TradeType = TradeType.Buy,
-                StartSpend = 200
+                StartSpend = 200,
+                Symbol = "BTCUSDT"
             };
 
             var result = await SUT.CreateActiveTrade(trade);
@@ -66,16 +62,17 @@ namespace CanisLupus.Tests
         {
             var trade = new Trade()
             {
-                OrderId = "12223",
                 TradeType = TradeType.Buy,
-                StartSpend = 200
+                StartSpend = 200,
+                Symbol = "BTCUSDT"
             };
 
             await SUT.CreateActiveTrade(trade);
-            var result = await SUT.FindActiveTrades();
+            var result = await SUT.FindActiveTrades("BTCUSDT");
 
             Assert.IsNotNull(result);
             Assert.AreEqual(result.Count, 1);
+            Assert.AreEqual(result[0].Symbol, "BTCUSDT");
         }
 
         [Test]
@@ -83,18 +80,17 @@ namespace CanisLupus.Tests
         {
             var trade = new Trade()
             {
-                OrderId = "12223",
                 TradeType = TradeType.Buy,
-                StartSpend = 200
+                StartSpend = 200,
+                Symbol = "BTCUSDT"
             };
 
             await SUT.CreateActiveTrade(trade);
 
-            var newTrade = (await SUT.FindActiveTrades()).FirstOrDefault();
+            var newTrade = (await SUT.FindActiveTrades("BTCUSDT")).FirstOrDefault();
 
             var order = new Order()
             {
-                Id = "orderId",
                 SpendAmount = 200,
                 Side = OrderSide.Sell,
             };

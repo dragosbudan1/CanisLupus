@@ -29,6 +29,7 @@ namespace CanisLupus.Common.Models
         [JsonConverter(typeof(StringEnumConverter))]
         [BsonRepresentation(BsonType.String)]
         public TradeStatus TradeStatus { get; set; }
+        public string Symbol { get; set; }
     }
 
     public enum TradeType

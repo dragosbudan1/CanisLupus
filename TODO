@@ -1,3 +1,4 @@
+Phase 1
 - add Db connection to record operations
 - add frontend
 - add configuration
@@ -9,5 +10,30 @@
 - some sort of pubsub (redis)
 - docker setup
 
+Phase 2
+- record exchange operations to Db
+- settings in frontend (propagate to worker)
+- log in frontend
+- settings for binance
 
-http://51.68.199.229:8075/ frontend
+
+
+http://51.68.199.229:9200/ frontend
+
+API Key
+Mi3q9KG0V8JNweFRc9A4sAyIoRbd7mMpPk9SJ9FFhROnuvhgpoVWltiu6S3qX0TM
+Secret Key
+pWPnIbsNYQh1jvOrd6Dx9Cm85y4BzpTHx6jV417sAs4CzA0Mtv6AulfmJUoHrQba
+
+Test network
+API Key: tT8nFgG1FFLXLSLhK8e5ezADVFJCS7VXTP1LZ6XTmozJCSUJInZdkN9iK2Kurlsp
+
+Secret Key: wd5rqLEGW8LKb1oW41ZXScp4hAxSswZMSpAIe75SF4m2sx6MljVCNFs4EJzGTy7K
+
+
+TTL messages
+reuses connections and channels
+1 channel per thread
+
+
+intersections per symbol
